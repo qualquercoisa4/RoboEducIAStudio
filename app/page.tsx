@@ -17,9 +17,9 @@ const questions = [
  ]},
  { title:"Qual tipo de jogo?", hint:"Escolha como será a aventura.", options:[
   {id:"platform",name:"Plataforma",image:"https://assets.st-note.com/img/1706538065499-itL1UWEhtk.png"},
-  {id:"adventure",name:"Aventura",image:"https://i.ytimg.com/vi/K8eO0N7YMVs/hq720.jpg"},
+  {id:"adventure",name:"Aventura",image:"https://s2-techtudo.glbimg.com/FRncuVVYu-3PBm7ub9HaTh1VDn4%3D/0x0%3A695x391/984x0/smart/filters%3Astrip_icc%28%29/i.s3.glbimg.com/v1/AUTH_08fbf48bc0524877943fe86e43087e7a/internal_photos/bs/2021/w/r/zQS09YRq2yywN0pRjTCQ/2017-02-07-caca.png"},
   {id:"survival",name:"Sobrevivência",image:"https://pbs.twimg.com/media/FYX0HUSXgAM7Fqo.jpg"},
-  {id:"action",name:"Ação",image:"https://cdn.wallpapersafari.com/71/28/Ubmeqp.jpg"}
+  {id:"action",name:"Ação",image:"https://www.gamereactor.eu/media/grtv/16/471643_w926.jpg"}
  ]}
 ];
 const stages=["Escolhas","Criação","Pronto!"];
