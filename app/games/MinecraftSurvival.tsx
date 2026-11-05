@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 type ItemId =
-  | "dirt" | "oak_log" | "oak_planks" | "cobblestone" | "coal"
+  | "dirt" | "oak_log" | "oak_planks" | "stick" | "cobblestone" | "coal"
   | "iron_ore" | "copper_ore" | "redstone" | "iron_ingot" | "copper_ingot"
   | "crafting_table" | "furnace" | "torch" | "apple" | "robot_bench" | "robot_core";
 
@@ -22,6 +22,8 @@ type Recipe = {
   output: ItemId;
   amount: number;
   needsTable?: boolean;
+  needsFurnace?: boolean;
+  needsRobotBench?: boolean;
 };
 
 type InputState = {
@@ -36,6 +38,7 @@ const ITEM_NAMES: Record<ItemId, string> = {
   dirt: "Terra",
   oak_log: "Tronco de carvalho",
   oak_planks: "Tábuas",
+  stick: "Graveto",
   cobblestone: "Pedregulho",
   coal: "Carvão",
   iron_ore: "Minério de ferro",
@@ -55,6 +58,7 @@ const ITEM_ICONS: Record<ItemId, string> = {
   dirt: "🟫",
   oak_log: "🪵",
   oak_planks: "🟨",
+  stick: "🪵",
   cobblestone: "🪨",
   coal: "⚫",
   iron_ore: "⛏️",
@@ -76,20 +80,21 @@ const HOTBAR: ItemId[] = [
 ];
 
 const STARTING_INVENTORY: Record<ItemId, number> = {
-  dirt: 24,
+  dirt: 0,
   oak_log: 0,
-  oak_planks: 20,
-  cobblestone: 16,
+  oak_planks: 0,
+  stick: 0,
+  cobblestone: 0,
   coal: 0,
   iron_ore: 0,
   copper_ore: 0,
   redstone: 0,
   iron_ingot: 0,
   copper_ingot: 0,
-  crafting_table: 1,
+  crafting_table: 0,
   furnace: 0,
-  torch: 8,
-  apple: 4,
+  torch: 0,
+  apple: 0,
   robot_bench: 0,
   robot_core: 0,
 };
@@ -100,28 +105,36 @@ const RECIPES: Recipe[] = [
     icon: "🪵", costs: { oak_log: 1 }, output: "oak_planks", amount: 4,
   },
   {
-    id: "table", title: "Bancada de trabalho", description: "Permite preparar estruturas e equipamentos.",
+    id: "sticks", title: "Gravetos", description: "Dois pedaços de madeira viram quatro gravetos.",
+    icon: "🥢", costs: { oak_planks: 2 }, output: "stick", amount: 4,
+  },
+  {
+    id: "table", title: "Bancada de trabalho", description: "Desbloqueia receitas de ferramentas e estruturas.",
     icon: "🧰", costs: { oak_planks: 4 }, output: "crafting_table", amount: 1,
   },
   {
-    id: "furnace", title: "Fornalha", description: "Use carvão e minérios para produzir metais.",
+    id: "torch", title: "Tochas", description: "Ilumine seu abrigo e dificulte a aproximação de monstros.",
+    icon: "🕯️", costs: { coal: 1, stick: 1 }, output: "torch", amount: 4, needsTable: true,
+  },
+  {
+    id: "furnace", title: "Fornalha", description: "Use a fornalha para processar minérios.",
     icon: "🔥", costs: { cobblestone: 8 }, output: "furnace", amount: 1, needsTable: true,
   },
   {
-    id: "iron", title: "Barra de ferro", description: "Refina minério de ferro com carvão.",
-    icon: "🔩", costs: { iron_ore: 1, coal: 1 }, output: "iron_ingot", amount: 1, needsTable: true,
+    id: "iron", title: "Barra de ferro", description: "Funda minério de ferro usando carvão.",
+    icon: "🔩", costs: { iron_ore: 1, coal: 1 }, output: "iron_ingot", amount: 1, needsTable: true, needsFurnace: true,
   },
   {
-    id: "copper", title: "Barra de cobre", description: "Refina minério de cobre com carvão.",
-    icon: "🟤", costs: { copper_ore: 1, coal: 1 }, output: "copper_ingot", amount: 1, needsTable: true,
+    id: "copper", title: "Barra de cobre", description: "Funda minério de cobre usando carvão.",
+    icon: "🟤", costs: { copper_ore: 1, coal: 1 }, output: "copper_ingot", amount: 1, needsTable: true, needsFurnace: true,
   },
   {
-    id: "robotBench", title: "Bancada RoboEduc", description: "Estação para construir componentes eletrônicos.",
+    id: "robotBench", title: "Bancada RoboEduc", description: "Estação tecnológica para construir componentes eletrônicos.",
     icon: "🤖", costs: { oak_planks: 4, copper_ingot: 2, iron_ingot: 1 }, output: "robot_bench", amount: 1, needsTable: true,
   },
   {
-    id: "robotCore", title: "Núcleo robótico", description: "Componente tecnológico avançado da missão opcional.",
-    icon: "💠", costs: { copper_ingot: 2, iron_ingot: 1, redstone: 1 }, output: "robot_core", amount: 1, needsTable: true,
+    id: "robotCore", title: "Núcleo robótico", description: "Componente tecnológico avançado feito com metais e redstone.",
+    icon: "💠", costs: { copper_ingot: 2, iron_ingot: 1, redstone: 1 }, output: "robot_core", amount: 1, needsTable: true, needsRobotBench: true,
   },
 ];
 
@@ -199,7 +212,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const gameOverRef = useRef(false);
   const inventoryOpenRef = useRef(false);
   const craftOpenRef = useRef(false);
-  const craftingTableAvailableRef = useRef(true);
+  const craftingTableAvailableRef = useRef(false);
+  const furnaceAvailableRef = useRef(false);
+  const robotBenchAvailableRef = useRef(false);
   const [started, setStarted] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [craftOpen, setCraftOpen] = useState(false);
@@ -249,6 +264,14 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       setNotice("Você precisa ter uma bancada de trabalho no inventário.");
       return;
     }
+    if (recipe.needsFurnace && current.furnace < 1 && !furnaceAvailableRef.current) {
+      setNotice("Você precisa fabricar e colocar uma fornalha.");
+      return;
+    }
+    if (recipe.needsRobotBench && current.robot_bench < 1 && !robotBenchAvailableRef.current) {
+      setNotice("Você precisa fabricar e colocar a Bancada RoboEduc.");
+      return;
+    }
     const possible = Object.entries(recipe.costs).every(([id, amount]) =>
       (current[id as ItemId] || 0) >= (amount || 0)
     );
@@ -293,7 +316,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     gameOverRef.current = false;
     inventoryOpenRef.current = false;
     craftOpenRef.current = false;
-    craftingTableAvailableRef.current = true;
+    craftingTableAvailableRef.current = false;
+    furnaceAvailableRef.current = false;
+    robotBenchAvailableRef.current = false;
     setHud({ health: 20, hunger: 20, day: 1, clock: "08:00", night: false });
     setGameOver(false);
     setStarted(false);
@@ -618,6 +643,8 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       putBlock(x, y, z, blockType);
       rebuildWorld();
       if (item === "crafting_table") craftingTableAvailableRef.current = true;
+      if (item === "furnace") furnaceAvailableRef.current = true;
+      if (item === "robot_bench") robotBenchAvailableRef.current = true;
       updateInventory(item, -1);
       setNotice(ITEM_NAMES[item] + " colocado.");
     };
@@ -886,7 +913,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   };
 
   const canCraft = (recipe: Recipe) => {
-    if (recipe.needsTable && inventory.crafting_table < 1) return false;
+    if (recipe.needsTable && inventory.crafting_table < 1 && !craftingTableAvailableRef.current) return false;
+    if (recipe.needsFurnace && inventory.furnace < 1 && !furnaceAvailableRef.current) return false;
+    if (recipe.needsRobotBench && inventory.robot_bench < 1 && !robotBenchAvailableRef.current) return false;
     return Object.entries(recipe.costs).every(([id, amount]) => inventory[id as ItemId] >= (amount || 0));
   };
 
@@ -1015,7 +1044,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
                 <button disabled={!canCraft(recipe)} onClick={() => craft(recipe)}>CRIAR ×{recipe.amount}</button>
               </div>
             ))}
-            <p className="mc-panel-note">Para criar a Bancada RoboEduc, explore as cavernas e procure cobre, ferro e redstone.</p>
+            <p className="mc-panel-note">Comece minerando madeira. Depois fabrique uma bancada, uma fornalha e só então processe os minérios para construir a Bancada RoboEduc.</p>
           </section>
         </div>
       )}
