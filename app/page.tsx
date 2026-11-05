@@ -7,16 +7,16 @@ const questions = [
   {id:"minecraft",name:"Minecraft",image:"https://commons.wikimedia.org/wiki/Special:FilePath/Minecraft%20-%201.18%20mountains.jpg"},
   {id:"roblox",name:"Roblox",image:"https://files.vgtimes.com/posts/2026-09/thumbs/1790856330.webp"},
   {id:"fortnite",name:"Fortnite",image:"https://www.unread.today/webroot/files/99acfb757ca3de8b1cee530b776a1da5.jpg"},
-  {id:"sonic",name:"Sonic",image:"https://i.guim.co.uk/img/media/180629c53bbca46b14ce0373a389a742d208d7ea/38_0_1067_640/master/1067.jpg?auto=format&fit=max&quality=85&s=aa7a2833b1c085dec544f34f4cf4bfc4&width=1200"}
+  {id:"sonic",name:"Sonic",image:"https://sp-ao.shortpixel.ai/client/to_webp%2Cq_glossy%2Cret_img%2Cw_512%2Ch_384/http%3A/obsoletegamer.com/wp-content/uploads/2011/11/Sonic-the-Hedgehog-Sega-Genesis-Gameplay-Screenshot-5.png"}
  ]},
  { title:"O que o jogador vai fazer?", hint:"Escolha o objetivo do jogo.", options:[
   {id:"explore",name:"Explorar",image:"https://s2-techtudo.glbimg.com/FRncuVVYu-3PBm7ub9HaTh1VDn4%3D/0x0%3A695x391/984x0/smart/filters%3Astrip_icc%28%29/i.s3.glbimg.com/v1/AUTH_08fbf48bc0524877943fe86e43087e7a/internal_photos/bs/2021/w/r/zQS09YRq2yywN0pRjTCQ/2017-02-07-caca.png"},
-  {id:"build",name:"Construir",image:"https://news.microsoft.com/wp-content/uploads/prod/sites/42/2021/04/Minecraft-Screenshot-2021.04.10-17.28.15.15-2.jpg"},
+  {id:"build",name:"Construir",image:"https://gaming-cdn.com/images/products/5657/screenshot/minecraft-windows-10-edition-windows-10-edition-pc-jeu-microsoft-store-wallpaper-4.jpg?v=1747754625"},
   {id:"battle",name:"Lutar",image:"https://www.unread.today/webroot/files/99acfb757ca3de8b1cee530b776a1da5.jpg"},
-  {id:"race",name:"Superar fases",image:"https://i.guim.co.uk/img/media/180629c53bbca46b14ce0373a389a742d208d7ea/38_0_1067_640/master/1067.jpg?auto=format&fit=max&quality=85&s=aa7a2833b1c085dec544f34f4cf4bfc4&width=1200"}
+  {id:"race",name:"Superar fases",image:"https://sp-ao.shortpixel.ai/client/to_webp%2Cq_glossy%2Cret_img%2Cw_512%2Ch_384/http%3A/obsoletegamer.com/wp-content/uploads/2011/11/Sonic-the-Hedgehog-Sega-Genesis-Gameplay-Screenshot-5.png"}
  ]},
  { title:"Qual tipo de jogo?", hint:"Escolha como será a aventura.", options:[
-  {id:"platform",name:"Plataforma",image:"https://i.guim.co.uk/img/media/180629c53bbca46b14ce0373a389a742d208d7ea/38_0_1067_640/master/1067.jpg?auto=format&fit=max&quality=85&s=aa7a2833b1c085dec544f34f4cf4bfc4&width=1200"},
+  {id:"platform",name:"Plataforma",image:"https://sp-ao.shortpixel.ai/client/to_webp%2Cq_glossy%2Cret_img%2Cw_512%2Ch_384/http%3A/obsoletegamer.com/wp-content/uploads/2011/11/Sonic-the-Hedgehog-Sega-Genesis-Gameplay-Screenshot-5.png"},
   {id:"adventure",name:"Aventura",image:"https://files.vgtimes.com/posts/2026-09/thumbs/1790856330.webp"},
   {id:"survival",name:"Sobrevivência",image:"https://commons.wikimedia.org/wiki/Special:FilePath/Minecraft%20-%201.18%20mountains.jpg"},
   {id:"action",name:"Ação",image:"https://www.unread.today/webroot/files/99acfb757ca3de8b1cee530b776a1da5.jpg"}
