@@ -37,7 +37,7 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
   const ctx=canvas.getContext("2d");if(!ctx)return;
   const W=960,H=540,worldW=3000;
   let player={x:70,y:365,vx:0,vy:0,w:34,h:48,onGround:false,invuln:0,attack:0,jumps:0};
-  let camera=0,localScore=0,localLives=isSurvival?4:3,done=false,frame=0,lastTime=0,elapsed=0,collectedCount=0,enemyKills=0,jumpWasDown=false;
+  let camera=0,localScore=0,localLives=isSurvival?4:3,done=false,frame=0,lastTime=0,elapsed=0,collectedCount=0,enemyKills=0,builtCount=0,jumpWasDown=false;
   const colors=isMinecraft?{sky:"#79bde9",far:"#5e9d74",top:"#78b84c",side:"#8c633f",accent:"#f0c94c",player:"#42a447"}:
    isFortnite?{sky:"#8da9cf",far:"#596b91",top:"#7788a7",side:"#3d4b68",accent:"#ffca4b",player:"#e8a45b"}:
    styleId==="roblox"?{sky:"#71d5f4",far:"#72c6a0",top:"#62c85b",side:"#278e62",accent:"#ffdc43",player:"#e8b13f"}:
@@ -47,7 +47,7 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
    {x:260,y:365,w:100,h:18},{x:700,y:315,w:110,h:18},{x:1030,y:275,w:115,h:18},{x:1430,y:330,w:110,h:18},{x:1790,y:290,w:110,h:18},{x:2200,y:340,w:110,h:18}];
   const collectibles=Array.from({length:12},(_,i)=>({x:260+i*225,y: i%3===0?330:i%3===1?385:285,taken:false}));
   const enemies=Array.from({length:7},(_,i)=>({x:650+i*340,y:390,dir:i%2? -1:1,min:610+i*340,max:790+i*340,alive:true,hit:0}));
-  const checkpoints=[{x:760,active:false},{x:1450,active:false},{x:2180,active:false}];
+  const checkpoints=[{x:760,active:false},{x:1450,active:false},{x:2180,active:false}];\n  const buildSites=[{x:850,built:false},{x:1600,built:false},{x:2400,built:false}];
   const setResult=(win:boolean)=>{done=true;setWon(win);setLost(!win);};
   const keyDown=(e:KeyboardEvent)=>{const k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," ","a","d","w","x","e"].includes(k))e.preventDefault();if(k==="arrowleft"||k==="a")keys.current.left=true;if(k==="arrowright"||k==="d")keys.current.right=true;if(k===" "||k==="arrowup"||k==="w")keys.current.jump=true;if(k==="x"||k==="e")keys.current.attack=true;};
   const keyUp=(e:KeyboardEvent)=>{const k=e.key.toLowerCase();if(k==="arrowleft"||k==="a")keys.current.left=false;if(k==="arrowright"||k==="d")keys.current.right=false;if(k===" "||k==="arrowup"||k==="w")keys.current.jump=false;if(k==="x"||k==="e")keys.current.attack=false;};
@@ -70,7 +70,7 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
     if(player.invuln>0)player.invuln-=dt;if(player.attack>0)player.attack-=dt;
     collectibles.forEach(item=>{if(!item.taken&&Math.abs(player.x+player.w/2-item.x)<27&&Math.abs(player.y+player.h/2-item.y)<34){item.taken=true;collectedCount++;localScore+=isExplore?25:isBuild?15:10;setScore(localScore);setProgress(collectedCount);}});
     enemies.forEach(enemy=>{if(!enemy.alive)return;enemy.x+=enemy.dir*(isAction?1.8:1.25)*dt;if(enemy.x<enemy.min||enemy.x>enemy.max)enemy.dir*=-1;
-     const near=Math.abs((player.x+player.w/2)-enemy.x)<43&&Math.abs((player.y+player.h/2)-enemy.y)<40;
+     const near=Math.abs((player.x+player.w/2)-enemy.x)<52&&Math.abs((player.y+player.h/2)-enemy.y)<68;
      if(keys.current.attack&&near&&player.attack<=0){enemy.alive=false;player.attack=24;localScore+=100;enemyKills++;setScore(localScore);setProgress(enemyKills);}
      else if(near&&player.vy>2&&player.y+player.h<enemy.y+18){enemy.alive=false;player.vy=-8;localScore+=isBattle?150:50;enemyKills++;setScore(localScore);setProgress(enemyKills);}
      else if(near&&player.invuln<=0)damage();
@@ -78,10 +78,10 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
     if(player.y>H+70){damage();player.y=250;player.vy=0;}
     checkpoints.forEach(cp=>{if(player.x>cp.x&&!cp.active){cp.active=true;localScore+=30;setScore(localScore);}});
     if(isSurvival&&elapsed>0&&Math.floor(elapsed)%35===0&&Math.abs(elapsed-Math.floor(elapsed))<dt/60){damage();}
-    if(isBuild&&collectedCount>=5&&player.x>2650)setResult(true);
-    else if(isExplore&&collectedCount>=6&&player.x>2650)setResult(true);
-    else if(isBattle&&enemies.every(e=>!e.alive)&&player.x>2650)setResult(true);
-    else if(isRace&&checkpoints.every(cp=>cp.active)&&player.x>2650)setResult(true);
+    if(isBuild&&collectedCount>=3&&builtCount>=3&&player.x>2800)setResult(true);
+    else if(isExplore&&collectedCount>=6&&player.x>2800)setResult(true);
+    else if(isBattle&&enemies.every(e=>!e.alive)&&player.x>2800)setResult(true);
+    else if(isRace&&checkpoints.every(cp=>cp.active)&&player.x>2800)setResult(true);
     else if(!isBuild&&!isExplore&&!isBattle&&!isRace&&player.x>2850)setResult(true);
     camera=Math.max(0,Math.min(worldW-W,player.x-W*.38));
    }
@@ -94,7 +94,7 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
    platforms.forEach((p,i)=>{ctx.fillStyle=colors.top;ctx.fillRect(p.x,p.y,p.w,12);ctx.fillStyle=colors.side;ctx.fillRect(p.x,p.y+12,p.w,p.h-12);if(isMinecraft){for(let x=p.x+8;x<p.x+p.w-8;x+=28){ctx.fillStyle="#ffffff18";ctx.fillRect(x,p.y+18,13,13);}}else if(styleId==="roblox"){ctx.fillStyle="#ffffff22";ctx.fillRect(p.x,p.y+12,p.w,5);}});
    collectibles.forEach(item=>{if(item.taken)return;ctx.fillStyle=colors.accent;ctx.beginPath();if(isMinecraft||isBuild)ctx.fillRect(item.x-10,item.y-10,20,20);else ctx.ellipse(item.x,item.y,11,15,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#fff8c7";ctx.lineWidth=3;ctx.stroke();});
    enemies.forEach(e=>{if(!e.alive)return;ctx.fillStyle=isFortnite?"#493d62":isSonic?"#d94a45":"#e85c48";ctx.beginPath();if(isMinecraft)ctx.fillRect(e.x-15,e.y-18,30,30);else ctx.arc(e.x,e.y,17,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.fillRect(e.x-8,e.y-5,5,6);ctx.fillRect(e.x+4,e.y-5,5,6);});
-   checkpoints.forEach(cp=>{ctx.fillStyle=cp.active?"#a8ec4d":"#ffffff";ctx.fillRect(cp.x,300,5,165);ctx.fillStyle=cp.active?"#a8ec4d":"#ffb84d";ctx.beginPath();ctx.moveTo(cp.x+5,302);ctx.lineTo(cp.x+55,320);ctx.lineTo(cp.x+5,340);ctx.fill();});
+   checkpoints.forEach(cp=>{ctx.fillStyle=cp.active?"#a8ec4d":"#ffffff";ctx.fillRect(cp.x,300,5,165);ctx.fillStyle=cp.active?"#a8ec4d":"#ffb84d";ctx.beginPath();ctx.moveTo(cp.x+5,302);ctx.lineTo(cp.x+55,320);ctx.lineTo(cp.x+5,340);ctx.fill();});\n   buildSites.forEach(site=>{ctx.fillStyle=site.built?"#8ee34f":"#f2d58a";ctx.fillRect(site.x-20,435,40,30);ctx.fillStyle=site.built?"#3b8737":"#9a7441";ctx.fillRect(site.x-14,420,28,15);if(!site.built){ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.strokeRect(site.x-25,410,50,55);}});
    // Goal gate
    ctx.fillStyle="#fff";ctx.fillRect(2890,280,7,185);ctx.fillStyle="#f04e75";ctx.fillRect(2897,282,60,38);
    // Avatar styles are intentionally distinct
@@ -114,11 +114,11 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
  },[restart,styleId,objectiveId,typeId,isSurvival,isAction,isBattle,isBuild,isExplore,isRace,isSonic,isMinecraft,isFortnite]);
  const hold=(key:"left"|"right"|"jump"|"attack",value:boolean)=>{keys.current[key]=value;};
  const restartGame=()=>{setScore(0);setLives(isSurvival?4:3);setProgress(0);setWon(false);setLost(false);setRestart(v=>v+1);};
- const goalText=isBuild?"Colete 5 blocos e alcance a saída":isExplore?"Encontre 6 cristais e alcance a saída":isBattle?"Derrote todos os inimigos e alcance a saída":isRace?"Ative os 3 checkpoints e corra até a saída":"Chegue ao portal no final da fase";
+ const goalText=isBuild?"Colete 3 blocos, construa 3 estações e chegue à saída":isExplore?"Encontre 6 cristais e alcance a saída":isBattle?"Derrote todos os inimigos e alcance a saída":isRace?"Ative os 3 checkpoints e corra até a saída":isSurvival?"Sobreviva e alcance o portal":"Chegue ao portal no final da fase";
  return <div className="play-screen">
   <canvas ref={canvasRef} width={960} height={540} className="platform-canvas"/>
-  <div className="game-hud"><div className="hud-brand"><span className="hud-dot"/> {gameName}</div><div className="hud-stats"><span>★ {score}</span><span>♥ {lives}</span><span className="hud-level">{goalText} · {progress}/{isBuild?5:isExplore?6:isBattle?7:3}</span></div><button className="hud-menu" onClick={onExit}>Ⅱ MENU</button></div>
-  <div className="touch-controls"><div className="move-controls"><button aria-label="Mover para esquerda" onPointerDown={()=>hold("left",true)} onPointerUp={()=>hold("left",false)} onPointerCancel={()=>hold("left",false)} onPointerLeave={()=>hold("left",false)}>◀</button><button aria-label="Mover para direita" onPointerDown={()=>hold("right",true)} onPointerUp={()=>hold("right",false)} onPointerCancel={()=>hold("right",false)} onPointerLeave={()=>hold("right",false)}>▶</button></div><button className="jump-control" onPointerDown={()=>hold("jump",true)} onPointerUp={()=>hold("jump",false)} onPointerCancel={()=>hold("jump",false)} onPointerLeave={()=>hold("jump",false)}>PULAR</button>{(isBattle||isAction)&&<button className="attack-control" onPointerDown={()=>hold("attack",true)} onPointerUp={()=>hold("attack",false)} onPointerCancel={()=>hold("attack",false)} onPointerLeave={()=>hold("attack",false)}>ATACAR</button>}</div>
+  <div className="game-hud"><div className="hud-brand"><span className="hud-dot"/> {gameName}</div><div className="hud-stats"><span>★ {score}</span><span>♥ {lives}</span><span className="hud-level">{goalText} · {isBuild?`Estações ${progress}/3`:isExplore?`Cristais ${progress}/6`:isBattle?`Inimigos ${progress}/7`:isRace?`Checkpoints ${progress}/3`:""}</span></div><button className="hud-menu" onClick={onExit}>Ⅱ MENU</button></div>
+  <div className="touch-controls"><div className="move-controls"><button aria-label="Mover para esquerda" onPointerDown={()=>hold("left",true)} onPointerUp={()=>hold("left",false)} onPointerCancel={()=>hold("left",false)} onPointerLeave={()=>hold("left",false)}>◀</button><button aria-label="Mover para direita" onPointerDown={()=>hold("right",true)} onPointerUp={()=>hold("right",false)} onPointerCancel={()=>hold("right",false)} onPointerLeave={()=>hold("right",false)}>▶</button></div><button className="jump-control" onPointerDown={()=>hold("jump",true)} onPointerUp={()=>hold("jump",false)} onPointerCancel={()=>hold("jump",false)} onPointerLeave={()=>hold("jump",false)}>PULAR</button>{isBuild?<button className="attack-control build-control" onPointerDown={()=>hold("attack",true)} onPointerUp={()=>hold("attack",false)} onPointerCancel={()=>hold("attack",false)} onPointerLeave={()=>hold("attack",false)}>CONSTRUIR</button>:(isBattle||isAction)&&<button className="attack-control" onPointerDown={()=>hold("attack",true)} onPointerUp={()=>hold("attack",false)} onPointerCancel={()=>hold("attack",false)} onPointerLeave={()=>hold("attack",false)}>ATACAR</button>}</div>
   {(won||lost)&&<div className="game-result"><div className="result-stars">{won?"★ ★ ★":"✦"}</div><h2>{won?"VOCÊ CONSEGUIU!":"FIM DE JOGO"}</h2><p>Pontuação: {score}</p><p>{won?"Objetivo concluído!":"Tente novamente para superar o desafio."}</p><button className="continue-button" onClick={restartGame}>JOGAR NOVAMENTE</button><button className="back-button" onClick={onExit}>VOLTAR AO MENU</button></div>}
  </div>;
 }
