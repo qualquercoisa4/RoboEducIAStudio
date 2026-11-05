@@ -2,7 +2,26 @@
   "name": "roboeducia-studio",
   "version": "0.3.0",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start", "lint": "eslint ." },
-  "dependencies": { "@huggingface/transformers": "^3.8.1", "next": "16.4.5", "react": "19.2.3", "react-dom": "19.2.3" },
-  "devDependencies": { "@types/node": "^22.0.0", "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0", "eslint": "^9.0.0", "eslint-config-next": "16.4.5", "typescript": "^5.0.0" }
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "next": "16.4.5",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.4.5",
+    "typescript": "^5.0.0",
+    "@types/three": "^0.187.0"
+  }
 }
