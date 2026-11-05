@@ -348,9 +348,41 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
 
     const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
     const blockMaterials: Record<BlockType, THREE.MeshLambertMaterial> = {} as Record<BlockType, THREE.MeshLambertMaterial>;
+    const blockTextures: THREE.CanvasTexture[] = [];
+    const makePixelTexture = (type: BlockType) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 16;
+      canvas.height = 16;
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      const base = BLOCK_COLORS[type];
+      const red = (base >> 16) & 255;
+      const green = (base >> 8) & 255;
+      const blue = base & 255;
+      context.fillStyle = "rgb(" + red + "," + green + "," + blue + ")";
+      context.fillRect(0, 0, 16, 16);
+      const salt = type.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+      for (let i = 0; i < 74; i++) {
+        const px = Math.floor(seeded(salt, i, 3) * 16);
+        const py = Math.floor(seeded(salt, i, 7) * 16);
+        const shade = seeded(salt, i, 11) > 0.52 ? 1.18 : 0.78;
+        const r = Math.max(0, Math.min(255, Math.round(red * shade)));
+        const g = Math.max(0, Math.min(255, Math.round(green * shade)));
+        const b = Math.max(0, Math.min(255, Math.round(blue * shade)));
+        context.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+        context.fillRect(px, py, 1 + (i % 7 === 0 ? 1 : 0), 1);
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestMipmapNearestFilter;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      blockTextures.push(texture);
+      return texture;
+    };
     (Object.keys(BLOCK_COLORS) as BlockType[]).forEach((type) => {
       blockMaterials[type] = new THREE.MeshLambertMaterial({
-        color: BLOCK_COLORS[type],
+        map: makePixelTexture(type),
+        color: 0xffffff,
         transparent: type === "leaves",
         opacity: type === "leaves" ? 0.92 : 1,
       });
@@ -836,6 +868,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       cubeGeometry.dispose();
       highlightGeometry.dispose();
       Object.values(blockMaterials).forEach((material) => material.dispose());
+      blockTextures.forEach((texture) => texture.dispose());
       mobGeometry.dispose();
       mobHeadGeometry.dispose();
       mobBodyMaterial.dispose();
