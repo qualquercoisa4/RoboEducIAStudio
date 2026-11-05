@@ -6,3 +6,46 @@
 
 .name-screen{min-height:480px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.name-screen h1{font-size:clamp(27px,5vw,38px);margin:12px 0 8px;color:#595361}.name-screen p{color:#888;margin:0 0 22px}.name-screen input{width:min(420px,100%);border:2px solid #e5e5e5;border-radius:12px;padding:16px 18px;font-size:18px;color:#55505e;outline:none;text-align:center}.name-screen input:focus{border-color:#4598d1}.main-game-menu{min-height:560px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 0}.menu-eyebrow{font-size:11px;letter-spacing:2px;font-weight:800;color:#9bc53d}.main-game-menu h1{font-size:clamp(32px,7vw,54px);margin:10px 0;color:#595361;overflow-wrap:anywhere}.main-game-menu>p{color:#888;margin:0 0 22px}.menu-preview{width:min(560px,100%);height:220px;position:relative;overflow:hidden;border-radius:18px;background:linear-gradient(#72d4ff,#e5f8ff 75%);box-shadow:0 8px 24px #00000012;margin-bottom:22px}.preview-hills{position:absolute;bottom:45px;left:-5%;width:110%;height:120px;background:#7bc985;clip-path:polygon(0 100%,0 80%,15% 25%,30% 70%,48% 10%,67% 68%,82% 22%,100% 80%,100% 100%)}.preview-ground{position:absolute;bottom:0;width:100%;height:48px;background:repeating-linear-gradient(90deg,#a96b3c 0 32px,#956039 32px 35px)}.preview-character{position:absolute;z-index:2;left:48%;bottom:45px;width:34px;height:46px;border-radius:12px 12px 5px 5px;background:#3157b7;color:transparent;border-top:12px solid #ffd1a3;box-shadow:0 0 0 4px #ffffff35}.play-button{border:0;border-radius:12px;background:#9bc53d;color:#fff;font-size:22px;font-weight:900;padding:17px 48px;box-shadow:0 4px 0 #76a329;margin:0 0 14px}.new-game-link{border:0;background:none;color:#4598d1;font-weight:700;padding:12px}.play-screen{width:100%;position:relative}.play-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}.play-top strong{font-size:20px;color:#595361;overflow-wrap:anywhere}.play-top span{font-size:13px;color:#888}.platform-canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:14px;background:#75d4ff;border:3px solid #e7edf0;touch-action:none}.touch-controls{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:20px;user-select:none}.touch-controls>div{display:flex;gap:10px}.touch-controls button{width:64px;height:58px;border:0;border-radius:14px;background:#4598d1;color:white;font-size:24px;font-weight:900;touch-action:none;box-shadow:0 4px 0 #2878b2}.touch-controls .jump-control{width:112px;background:#9bc53d;box-shadow:0 4px 0 #76a329;font-size:15px}.game-result{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:22px;text-align:center;box-shadow:0 8px 35px #0004;z-index:4;width:min(340px,90%)}.game-result h2{margin:0 0 8px;color:#595361}.game-result p{color:#888}
 @media(max-width:600px){.name-screen{min-height:420px}.main-game-menu{min-height:440px}.menu-preview{height:170px}.play-top strong{font-size:16px}.play-top span{font-size:11px}.touch-controls button{width:58px;height:54px}.touch-controls .jump-control{width:100px}}
+
+/* Immersive game presentation */
+body:has(.play-screen),body:has(.main-game-menu){overflow:hidden;background:#080e1b}
+.creator:has(.play-screen),.creator:has(.main-game-menu){width:100%;max-width:none;min-height:100dvh;margin:0;padding:0;display:block;flex:1}
+.play-screen{position:fixed;inset:0;width:100vw;height:100dvh;z-index:1000;overflow:hidden;background:#081321}
+.platform-canvas{position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;aspect-ratio:auto;border:0;border-radius:0;display:block;object-fit:fill;touch-action:none}
+.game-hud{position:absolute;z-index:3;top:0;left:0;right:0;min-height:68px;padding:12px 22px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;color:#fff;background:linear-gradient(180deg,#07101ddd,#07101d00)}
+.hud-brand{font-weight:900;font-size:clamp(14px,2vw,21px);text-shadow:0 2px 5px #0008;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hud-dot{display:inline-block;width:9px;height:9px;background:#9bc53d;border-radius:50%;box-shadow:0 0 12px #9bc53d;margin-right:8px}
+.hud-stats{display:flex;align-items:center;gap:18px;font-size:15px;font-weight:900;text-shadow:0 2px 5px #0008;white-space:nowrap}
+.hud-level{font-size:11px;letter-spacing:1px;color:#e4f5ff}
+.hud-menu{justify-self:end;border:1px solid #ffffff70;background:#101c31a8;color:#fff;border-radius:10px;padding:10px 15px;font-weight:900;backdrop-filter:blur(8px)}
+.play-screen .touch-controls{position:absolute;z-index:4;left:0;right:0;bottom:max(24px,env(safe-area-inset-bottom));padding:0 clamp(18px,5vw,58px);margin:0;display:flex;justify-content:space-between;align-items:end;pointer-events:none}
+.play-screen .touch-controls>div,.play-screen .touch-controls>button{pointer-events:auto}
+.play-screen .touch-controls button{width:clamp(58px,8vw,82px);height:clamp(58px,8vw,82px);border-radius:50%;background:#0e1d34a8;border:2px solid #ffffff9c;box-shadow:0 5px 18px #0005,inset 0 0 18px #ffffff15;color:#fff;font-size:27px;backdrop-filter:blur(6px)}
+.play-screen .touch-controls>div{display:flex;gap:14px}
+.play-screen .touch-controls .jump-control{width:clamp(84px,11vw,112px);height:clamp(84px,11vw,112px);background:#91bd31d9;border-color:#eaffb4;font-size:15px}
+.game-result{position:absolute;z-index:8;inset:0;left:0;top:0;transform:none;width:100%;height:100%;max-width:none;border-radius:0;background:#07101dcc;backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;box-shadow:none}
+.game-result h2{font-size:clamp(30px,6vw,58px);color:#fff;margin:12px 0}
+.game-result p{font-size:20px;color:#e7efff}
+.result-stars{font-size:48px;color:#ffce45;letter-spacing:8px}
+.game-result .continue-button{font-size:17px;padding:16px 28px}
+.main-game-menu{position:fixed;inset:0;z-index:999;width:100vw;height:100dvh;min-height:0;overflow:hidden;padding:clamp(24px,6vh,70px) 20px;justify-content:center;color:#fff;background:radial-gradient(ellipse at 50% 35%,#245b83 0%,#132c4c 48%,#081323 100%)}
+.main-game-menu:before,.main-game-menu:after{content:"";position:absolute;pointer-events:none;border-radius:50%;filter:blur(1px)}
+.main-game-menu:before{width:55vw;height:55vw;max-width:650px;max-height:650px;background:#65b9d31c;top:-30%;right:-10%}
+.main-game-menu:after{width:50vw;height:50vw;max-width:580px;max-height:580px;background:#a5d84b16;bottom:-35%;left:-10%}
+.main-game-menu>*{position:relative;z-index:1}
+.main-game-menu .menu-eyebrow{color:#c8f17b;font-size:12px;letter-spacing:3px;text-shadow:0 2px 12px #0006}
+.main-game-menu h1{font-size:clamp(38px,8vw,82px);line-height:1.02;color:#fff;text-shadow:0 5px 0 #0004,0 12px 28px #0006;margin:15px 0}
+.main-game-menu>p{color:#d5e7f3;font-size:clamp(14px,2vw,19px);margin-bottom:clamp(14px,3vh,28px)}
+.main-game-menu .menu-preview{width:min(760px,86vw);height:clamp(150px,30vh,270px);border:3px solid #ffffff40;border-radius:22px;box-shadow:0 20px 55px #0006;margin-bottom:clamp(14px,3vh,26px)}
+.main-game-menu .play-button{min-width:220px;padding:18px 50px;border-radius:14px;background:linear-gradient(180deg,#b7e84b,#83b52c);box-shadow:0 6px 0 #527d1e,0 12px 30px #0005;font-size:clamp(18px,2.5vw,25px);letter-spacing:1px}
+.main-game-menu .back-button{color:#e1efff;background:#ffffff15;border-radius:10px;padding:10px 20px;margin-top:8px}
+.main-game-menu .new-game-link{color:#b7dff8}
+.main-game-menu .chosen-summary{display:none}
+@media(orientation:portrait){
+ .game-hud{grid-template-columns:1fr auto;min-height:58px;padding:9px 12px}
+ .hud-stats{grid-column:1/-1;grid-row:2;justify-content:center;gap:20px;font-size:13px}
+ .hud-menu{grid-column:2;grid-row:1}
+ .play-screen .touch-controls{bottom:max(18px,env(safe-area-inset-bottom));padding:0 16px}
+ .main-game-menu .menu-preview{height:22vh;width:92vw}
+}
+@media(hover:hover) and (pointer:fine){.play-screen .touch-controls{opacity:.72}.play-screen .touch-controls button:hover{background:#4598d1e8}}
