@@ -121,14 +121,6 @@ const RECIPES: Recipe[] = [
     icon: "🔥", costs: { cobblestone: 8 }, output: "furnace", amount: 1, needsTable: true,
   },
   {
-    id: "iron", title: "Barra de ferro", description: "Funda minério de ferro usando carvão.",
-    icon: "🔩", costs: { iron_ore: 1, coal: 1 }, output: "iron_ingot", amount: 1, needsTable: true, needsFurnace: true,
-  },
-  {
-    id: "copper", title: "Barra de cobre", description: "Funda minério de cobre usando carvão.",
-    icon: "🟤", costs: { copper_ore: 1, coal: 1 }, output: "copper_ingot", amount: 1, needsTable: true, needsFurnace: true,
-  },
-  {
     id: "robotBench", title: "Bancada RoboEduc", description: "Estação tecnológica para construir componentes eletrônicos.",
     icon: "🤖", costs: { oak_planks: 4, copper_ingot: 2, iron_ingot: 1 }, output: "robot_bench", amount: 1, needsTable: true,
   },
@@ -203,7 +195,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const inputRef = useRef<InputState>({ forward: false, backward: false, left: false, right: false, jump: false });
   const inventoryRef = useRef<Record<ItemId, number>>({ ...STARTING_INVENTORY });
   const selectedRef = useRef(0);
-  const actionsRef = useRef<{ mine?: () => void; place?: () => void; eat?: () => void }>({});
+  const actionsRef = useRef<{ mine?: () => void; place?: () => void; eat?: () => void; interact?: () => void }>({});
   const [inventory, setInventory] = useState<Record<ItemId, number>>({ ...STARTING_INVENTORY });
   const [selected, setSelected] = useState(0);
   const [hud, setHud] = useState({ health: 20, hunger: 20, day: 1, clock: "08:00", night: false });
@@ -212,12 +204,14 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const gameOverRef = useRef(false);
   const inventoryOpenRef = useRef(false);
   const craftOpenRef = useRef(false);
+  const furnaceOpenRef = useRef(false);
   const craftingTableAvailableRef = useRef(false);
   const furnaceAvailableRef = useRef(false);
   const robotBenchAvailableRef = useRef(false);
   const [started, setStarted] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [craftOpen, setCraftOpen] = useState(false);
+  const [furnaceOpen, setFurnaceOpen] = useState(false);
   const [locked, setLocked] = useState(false);
   const [notice, setNotice] = useState("Colete madeira, minério e sobreviva à noite.");
   const [gameOver, setGameOver] = useState(false);
@@ -249,6 +243,34 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     craftOpenRef.current = next;
     if (next) { inventoryOpenRef.current = false; setInventoryOpen(false); }
     setCraftOpen(next);
+  };
+
+  const openFurnace = () => {
+    inventoryOpenRef.current = false;
+    craftOpenRef.current = false;
+    furnaceOpenRef.current = true;
+    setInventoryOpen(false);
+    setCraftOpen(false);
+    setFurnaceOpen(true);
+  };
+
+  const closeFurnace = () => {
+    furnaceOpenRef.current = false;
+    setFurnaceOpen(false);
+  };
+
+  const smelt = (ore: "iron_ore" | "copper_ore") => {
+    const current = inventoryRef.current;
+    if (current[ore] < 1 || current.coal < 1) {
+      setNotice("A fornalha precisa de minério e carvão.");
+      return;
+    }
+    const output: ItemId = ore === "iron_ore" ? "iron_ingot" : "copper_ingot";
+    const next = { ...current, [ore]: current[ore] - 1, coal: current.coal - 1 };
+    next[output] = (next[output] || 0) + 1;
+    inventoryRef.current = next;
+    setInventory(next);
+    setNotice("A fornalha produziu 1 barra de " + (ore === "iron_ore" ? "ferro." : "cobre."));
   };
 
   const updateInventory = (item: ItemId, amount: number) => {
@@ -316,6 +338,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     gameOverRef.current = false;
     inventoryOpenRef.current = false;
     craftOpenRef.current = false;
+    furnaceOpenRef.current = false;
     craftingTableAvailableRef.current = false;
     furnaceAvailableRef.current = false;
     robotBenchAvailableRef.current = false;
@@ -324,6 +347,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     setStarted(false);
     setInventoryOpen(false);
     setCraftOpen(false);
+    setFurnaceOpen(false);
     setRestart((value) => value + 1);
   };
 
@@ -616,7 +640,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     };
 
     const mineBlock = () => {
-      if (!startedRef.current || gameOverRef.current || inventoryOpenRef.current || craftOpenRef.current) return;
+      if (!startedRef.current || gameOverRef.current || inventoryOpenRef.current || craftOpenRef.current || furnaceOpenRef.current) return;
       raycaster.setFromCamera(center, camera);
       const mobHits = raycaster.intersectObjects(mobs.map((mob) => mob.group), true);
       if (mobHits.length) {
@@ -684,8 +708,24 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       setNotice(ITEM_NAMES[item] + " colocado.");
     };
 
+    const interact = () => {
+      if (!startedRef.current || gameOverRef.current) return;
+      const target = currentTarget();
+      if (target?.type === "furnace") {
+        openFurnace();
+        setNotice("Fornalha aberta. Coloque minério e carvão para fundir.");
+      } else if (target?.type === "crafting_table") {
+        toggleCrafting();
+        setNotice("Bancada de trabalho aberta.");
+      } else if (target?.type === "robot_bench") {
+        toggleCrafting();
+        setNotice("Bancada RoboEduc: use as receitas tecnológicas.");
+      } else {
+        setNotice("Aponte para uma bancada ou fornalha para interagir.");
+      }
+    };
     const eatSelected = () => eatApple();
-    actionsRef.current = { mine: mineBlock, place: placeBlock, eat: eatSelected };
+    actionsRef.current = { mine: mineBlock, place: placeBlock, eat: eatSelected, interact };
 
     const updateCamera = () => {
       camera.position.set(player.x, player.y + 1.62, player.z);
@@ -714,6 +754,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       if (key === "e" && !event.repeat) toggleInventory();
       if (key === "c" && !event.repeat) toggleCrafting();
       if (key === "f") eatApple();
+      if (key === "r" && !event.repeat) actionsRef.current.interact?.();
       if (key === "escape" && document.pointerLockElement === renderer.domElement) document.exitPointerLock();
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -787,7 +828,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       const dt = Math.min(0.04, Math.max(0.001, (now - lastTime) / 1000));
       lastTime = now;
 
-      if (startedRef.current && !gameOverRef.current && !inventoryOpenRef.current && !craftOpenRef.current) {
+      if (startedRef.current && !gameOverRef.current && !inventoryOpenRef.current && !craftOpenRef.current && !furnaceOpenRef.current) {
         const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
         const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
         let moveX = 0, moveZ = 0;
@@ -1018,6 +1059,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
         <span><kbd>BOTÃO DIREITO</kbd> colocar</span>
         <span><kbd>E</kbd> inventário</span>
         <span><kbd>C</kbd> fabricar</span>
+        <span><kbd>R</kbd> interagir</span>
       </div>
 
       <div className="mc-mobile-left">
@@ -1036,6 +1078,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
         <button className="mc-place" onPointerDown={() => actionsRef.current.place?.()}>COLOCAR</button>
         <button className="mc-jump" onPointerDown={() => setMove("jump", true)} onPointerUp={() => setMove("jump", false)} onPointerLeave={() => setMove("jump", false)} onPointerCancel={() => setMove("jump", false)}>PULAR</button>
         <button className="mc-eat" onPointerDown={eatApple}>COMER</button>
+        <button className="mc-use" onPointerDown={() => actionsRef.current.interact?.()}>USAR</button>
       </div>
 
       <div className="mc-side-actions">
@@ -1060,6 +1103,33 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
               ))}
             </div>
             <p className="mc-panel-note">Use as teclas 1–8 ou toque na barra inferior para selecionar um item.</p>
+          </section>
+        </div>
+      )}
+
+      {furnaceOpen && (
+        <div className="mc-modal-backdrop" onClick={closeFurnace}>
+          <section className="mc-panel mc-furnace-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="mc-panel-heading">
+              <div><small>PROCESSAMENTO</small><h2>Fornalha</h2></div>
+              <button onClick={closeFurnace}>✕</button>
+            </div>
+            <p className="mc-furnace-intro">Cada barra consome uma unidade do minério e uma unidade de carvão.</p>
+            <div className="mc-smelt-row">
+              <span>⛏️ <b>Minério de ferro</b><small>{inventory.iron_ore} disponíveis</small></span>
+              <i>＋</i>
+              <span>⚫ <b>Carvão</b><small>{inventory.coal} disponíveis</small></span>
+              <i>→</i>
+              <button disabled={inventory.iron_ore < 1 || inventory.coal < 1} onClick={() => smelt("iron_ore")}>FUNDIR 🔩</button>
+            </div>
+            <div className="mc-smelt-row">
+              <span>🟠 <b>Minério de cobre</b><small>{inventory.copper_ore} disponíveis</small></span>
+              <i>＋</i>
+              <span>⚫ <b>Carvão</b><small>{inventory.coal} disponíveis</small></span>
+              <i>→</i>
+              <button disabled={inventory.copper_ore < 1 || inventory.coal < 1} onClick={() => smelt("copper_ore")}>FUNDIR 🟤</button>
+            </div>
+            <p className="mc-panel-note">A fornalha permanece no mundo. Volte a ela sempre que quiser produzir mais barras.</p>
           </section>
         </div>
       )}
