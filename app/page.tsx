@@ -11,15 +11,15 @@ const questions = [
  ]},
  { title:"O que o jogador vai fazer?", hint:"Escolha o objetivo do jogo.", options:[
   {id:"explore",name:"Explorar",image:"https://s2-techtudo.glbimg.com/FRncuVVYu-3PBm7ub9HaTh1VDn4%3D/0x0%3A695x391/984x0/smart/filters%3Astrip_icc%28%29/i.s3.glbimg.com/v1/AUTH_08fbf48bc0524877943fe86e43087e7a/internal_photos/bs/2021/w/r/zQS09YRq2yywN0pRjTCQ/2017-02-07-caca.png"},
-  {id:"build",name:"Construir",image:"https://gaming-cdn.com/images/products/5657/screenshot/minecraft-windows-10-edition-windows-10-edition-pc-jeu-microsoft-store-wallpaper-4.jpg?v=1747754625"},
-  {id:"battle",name:"Lutar",image:"https://www.unread.today/webroot/files/99acfb757ca3de8b1cee530b776a1da5.jpg"},
-  {id:"race",name:"Superar fases",image:"https://sp-ao.shortpixel.ai/client/to_webp%2Cq_glossy%2Cret_img%2Cw_512%2Ch_384/http%3A/obsoletegamer.com/wp-content/uploads/2011/11/Sonic-the-Hedgehog-Sega-Genesis-Gameplay-Screenshot-5.png"}
+  {id:"build",name:"Construir",image:"https://pojitora-online.net/wp-content/uploads/2018/01/2018-01-16-16-1024x576.png"},
+  {id:"battle",name:"Lutar",image:"https://imagenes.businessinsider.es/files/og_thumbnail/uploads/imagenes/2022/10/11/68bc2bb3b5f6d.jpeg"},
+  {id:"race",name:"Superar fases",image:"https://assets.st-note.com/img/1706538065499-itL1UWEhtk.png"}
  ]},
  { title:"Qual tipo de jogo?", hint:"Escolha como será a aventura.", options:[
-  {id:"platform",name:"Plataforma",image:"https://sp-ao.shortpixel.ai/client/to_webp%2Cq_glossy%2Cret_img%2Cw_512%2Ch_384/http%3A/obsoletegamer.com/wp-content/uploads/2011/11/Sonic-the-Hedgehog-Sega-Genesis-Gameplay-Screenshot-5.png"},
-  {id:"adventure",name:"Aventura",image:"https://files.vgtimes.com/posts/2026-09/thumbs/1790856330.webp"},
-  {id:"survival",name:"Sobrevivência",image:"https://commons.wikimedia.org/wiki/Special:FilePath/Minecraft%20-%201.18%20mountains.jpg"},
-  {id:"action",name:"Ação",image:"https://www.unread.today/webroot/files/99acfb757ca3de8b1cee530b776a1da5.jpg"}
+  {id:"platform",name:"Plataforma",image:"https://assets.st-note.com/img/1706538065499-itL1UWEhtk.png"},
+  {id:"adventure",name:"Aventura",image:"https://i.ytimg.com/vi/K8eO0N7YMVs/hq720.jpg"},
+  {id:"survival",name:"Sobrevivência",image:"https://pbs.twimg.com/media/FYX0HUSXgAM7Fqo.jpg"},
+  {id:"action",name:"Ação",image:"https://cdn.wallpapersafari.com/71/28/Ubmeqp.jpg"}
  ]}
 ];
 const stages=["Escolhas","Criação","Pronto!"];
