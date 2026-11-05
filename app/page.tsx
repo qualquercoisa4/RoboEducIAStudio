@@ -30,12 +30,36 @@ export default function Home(){
  const [done,setDone]=useState(false);
  const [progress,setProgress]=useState(0);
  const q=questions[step];
- function speakOption(name:string){if(typeof window==="undefined"||!("speechSynthesis" in window))return;window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(name);utterance.lang="pt-BR";utterance.rate=0.92;utterance.pitch=1.25;const voices=window.speechSynthesis.getVoices();const portuguese=voices.filter(voice=>voice.lang.toLowerCase().startsWith("pt-br"));const preferred=portuguese.find(voice=>/female|feminina|francisca|google.*portugu/i.test(voice.name))||portuguese[0]||voices.find(voice=>voice.lang.toLowerCase().startsWith("pt"));if(preferred)utterance.voice=preferred;window.speechSynthesis.speak(utterance);}\n function create(){setCreating(true);setProgress(0);let p=0;const timer=window.setInterval(()=>{p+=4;setProgress(p);if(p>=100){window.clearInterval(timer);setCreating(false);setDone(true);}},75);}
+ const [voiceStatus,setVoiceStatus]=useState("");
+ function speakOption(name:string){
+  if(typeof window==="undefined"||!("speechSynthesis" in window)||!("SpeechSynthesisUtterance" in window)){setVoiceStatus("Este navegador não oferece voz automática.");return;}
+  const synth=window.speechSynthesis;
+  synth.cancel();
+  const utterance=new SpeechSynthesisUtterance(name);
+  utterance.lang="pt-BR";utterance.rate=0.88;utterance.pitch=1.3;utterance.volume=1;
+  const chooseVoice=()=>{
+   const voices=synth.getVoices();
+   const ptBr=voices.filter(v=>v.lang.toLowerCase()==="pt-br");
+   const pt=voices.filter(v=>v.lang.toLowerCase().startsWith("pt"));
+   const selected=ptBr.find(v=>/google|brasil|brasileira|francisca|female/i.test(v.name))||ptBr[0]||pt[0];
+   if(selected)utterance.voice=selected;
+   utterance.onstart=()=>setVoiceStatus("");
+   utterance.onerror=()=>setVoiceStatus("Não foi possível reproduzir a voz. Verifique a síntese de voz do Android.");
+   synth.resume();
+   synth.speak(utterance);
+  };
+  if(synth.getVoices().length===0){
+   let played=false;
+   const onVoices=()=>{if(played)return;played=true;synth.removeEventListener("voiceschanged",onVoices);chooseVoice();};
+   synth.addEventListener("voiceschanged",onVoices);
+   window.setTimeout(()=>{if(!played){played=true;synth.removeEventListener("voiceschanged",onVoices);chooseVoice();}},700);
+  }else chooseVoice();
+ }\n function create(){setCreating(true);setProgress(0);let p=0;const timer=window.setInterval(()=>{p+=4;setProgress(p);if(p>=100){window.clearInterval(timer);setCreating(false);setDone(true);}},75);}
  function reset(){setStep(0);setAnswers({});setCreating(false);setDone(false);setProgress(0);}
  return <main className="robo-app">
-  <header className="robo-header"><div className="robo-logo"><div className="robo-word">ROBO</div><div className="educ-word"><b>E</b><b>D</b><b>U</b><b>C</b></div><small>ESCOLA DE PROGRAMAÇÃO E ROBÓTICA</small></div><span className="header-tag">GAME STUDIO</span></header>
+  <header className="robo-header"><div className="robo-logo"><div className="robo-word">ROBO</div><div className="educ-word"><b>E</b><b>D</b><b>U</b><b>C</b></div><small>ESCOLA DE PROGRAMAÇÃO E ROBÓTICA</small></div><div className="header-tools"><button className="voice-test" type="button" onClick={()=>speakOption("Olá! Vamos criar um jogo?")}>🔊 Testar voz</button><span className="header-tag">GAME STUDIO</span></div></header>
   <section className="creator">
-   {!creating&&!done?<><div className="step-dots">{questions.map((_,i)=><span className={i<=step?"active":""} key={i}/>)}</div><div className="question-title"><span className="question-count">PERGUNTA {step+1} DE {questions.length}</span><h1>{q.title}</h1><p>{q.hint}</p></div><div className="game-options">{q.options.map((o,i)=><button key={o.id} className={`game-option ${answers[step]===o.id?"chosen":""}`} onClick={()=>{setAnswers({...answers,[step]:o.id});speakOption(o.name);}}><img src={o.image} alt={o.name} loading="eager" onError={(event)=>{const img=event.currentTarget;img.onerror=null;img.classList.add("image-failed");img.removeAttribute("src");}}/><span className="option-name">{o.name}</span><span className="option-check">{answers[step]===o.id?"✓":""}</span></button>)}</div><div className="creator-actions"><button className="back-button" onClick={()=>setStep(Math.max(0,step-1))} disabled={step===0}>Voltar</button><button className="continue-button" disabled={!answers[step]} onClick={()=>step<questions.length-1?setStep(step+1):create()}>{step===questions.length-1?"Criar meu jogo":"Continuar"} <span>→</span></button></div></>:creating?<div className="creation"><div className="creation-logo"><span>R</span><span>O</span><span>B</span><span>O</span><b>E</b><b>D</b><b>U</b><b>C</b></div><h1>Construindo seu jogo...</h1><div className="loader-track"><div style={{width:progress+"%"}}/></div><strong>{progress}%</strong><p>{progress<25?"Separando as peças...":progress<50?"Montando o cenário...":progress<75?"Preparando os personagens...":"Quase pronto!"}</p><div className="loader-spark">✦</div></div>:<div className="done-screen"><div className="done-mark">✓</div><h1>Seu jogo está pronto!</h1><p>Suas escolhas foram recebidas.</p><div className="chosen-summary">{questions.map((question,i)=><div key={question.title}><span>{question.title}</span><b>{question.options.find(o=>o.id===answers[i])?.name}</b></div>)}</div><button className="continue-button" onClick={reset}>Criar outro jogo ↻</button></div>}
+   {!creating&&!done?<>{voiceStatus&&<p className="voice-status" role="status">{voiceStatus}</p>}<div className="step-dots">{questions.map((_,i)=><span className={i<=step?"active":""} key={i}/>)}</div><div className="question-title"><span className="question-count">PERGUNTA {step+1} DE {questions.length}</span><h1>{q.title}</h1><p>{q.hint}</p></div><div className="game-options">{q.options.map((o,i)=><button key={o.id} className={`game-option ${answers[step]===o.id?"chosen":""}`} onClick={()=>{setAnswers({...answers,[step]:o.id});speakOption(o.name);}}><img src={o.image} alt={o.name} loading="eager" onError={(event)=>{const img=event.currentTarget;img.onerror=null;img.classList.add("image-failed");img.removeAttribute("src");}}/><span className="option-name">{o.name}</span><span className="option-check">{answers[step]===o.id?"✓":""}</span></button>)}</div><div className="creator-actions"><button className="back-button" onClick={()=>setStep(Math.max(0,step-1))} disabled={step===0}>Voltar</button><button className="continue-button" disabled={!answers[step]} onClick={()=>step<questions.length-1?setStep(step+1):create()}>{step===questions.length-1?"Criar meu jogo":"Continuar"} <span>→</span></button></div></>:creating?<div className="creation"><div className="creation-logo"><span>R</span><span>O</span><span>B</span><span>O</span><b>E</b><b>D</b><b>U</b><b>C</b></div><h1>Construindo seu jogo...</h1><div className="loader-track"><div style={{width:progress+"%"}}/></div><strong>{progress}%</strong><p>{progress<25?"Separando as peças...":progress<50?"Montando o cenário...":progress<75?"Preparando os personagens...":"Quase pronto!"}</p><div className="loader-spark">✦</div></div>:<div className="done-screen"><div className="done-mark">✓</div><h1>Seu jogo está pronto!</h1><p>Suas escolhas foram recebidas.</p><div className="chosen-summary">{questions.map((question,i)=><div key={question.title}><span>{question.title}</span><b>{question.options.find(o=>o.id===answers[i])?.name}</b></div>)}</div><button className="continue-button" onClick={reset}>Criar outro jogo ↻</button></div>}
   </section>
   <footer className="robo-footer">FEITO PARA APRENDER E CRIAR <span>ROBOEDUC</span></footer>
  </main>;
