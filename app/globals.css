@@ -187,3 +187,20 @@ body:has(.play-screen),body:has(.main-game-menu){overflow:hidden;background:#080
 }
 
 body:has(.mc-game),html:has(.mc-game){overflow:hidden;height:100%;touch-action:none}
+
+
+.mc-furnace-intro{margin:-5px 0 18px;color:#cbd8e4;font-size:12px;line-height:1.5}
+.mc-smelt-row{display:grid;grid-template-columns:minmax(110px,1fr) 22px minmax(100px,1fr) 22px auto;gap:10px;align-items:center;padding:14px 0;border-top:1px solid #ffffff24}
+.mc-smelt-row>span{display:grid;gap:4px;padding:10px;background:#ffffff0e;border:1px solid #ffffff24;border-radius:4px}
+.mc-smelt-row>span b{font-size:12px}
+.mc-smelt-row>span small{font-size:10px;color:#becbd7}
+.mc-smelt-row>i{text-align:center;font-style:normal;color:#e8ca75;font-weight:900}
+.mc-smelt-row>button{border:1px solid #e7cf90;background:linear-gradient(#c18c35,#87612b);color:#fff;border-radius:4px;padding:11px 12px;font-size:10px;font-weight:900;white-space:nowrap}
+.mc-smelt-row>button:disabled{opacity:.35;filter:grayscale(1)}
+.mc-mobile-actions .mc-use{background:#477a55e8}
+@media(max-width:760px){
+  .mc-smelt-row{grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px}
+  .mc-smelt-row>button{grid-column:1/-1;justify-self:stretch}
+  .mc-smelt-row>span{padding:8px}
+  .mc-smelt-row>span b{font-size:10px}
+}
