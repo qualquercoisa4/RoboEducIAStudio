@@ -224,12 +224,14 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const toggleInventory = () => {
     const next = !inventoryOpenRef.current;
     inventoryOpenRef.current = next;
+    if (next) { craftOpenRef.current = false; setCraftOpen(false); }
     setInventoryOpen(next);
   };
 
   const toggleCrafting = () => {
     const next = !craftOpenRef.current;
     craftOpenRef.current = next;
+    if (next) { inventoryOpenRef.current = false; setInventoryOpen(false); }
     setCraftOpen(next);
   };
 
@@ -438,6 +440,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     };
     rebuildWorld();
 
+    const dayColor = new THREE.Color(0x82c8f0);
+    const nightColor = new THREE.Color(0x101a39);
+    const skyColor = new THREE.Color();
     const spawnX = 0;
     const spawnZ = 0;
     const spawnY = terrainHeight(spawnX, spawnZ) + 1.01;
@@ -661,7 +666,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     };
 
     renderer.domElement.addEventListener("click", () => {
-      if (started && window.matchMedia("(pointer:fine)").matches && document.pointerLockElement !== renderer.domElement) {
+      if (startedRef.current && window.matchMedia("(pointer:fine)").matches && document.pointerLockElement !== renderer.domElement) {
         renderer.domElement.requestPointerLock?.();
       }
     });
@@ -739,7 +744,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
         const daylight = Math.max(0.12, Math.min(1, Math.sin((phase - 0.25) * Math.PI * 2) * 0.5 + 0.55));
         sun.intensity = 0.12 + daylight * 1.65;
         hemisphere.intensity = 0.22 + daylight * 1.1;
-        const skyColor = new THREE.Color().lerpColors(new THREE.Color(0x101a39), new THREE.Color(0x82c8f0), daylight);
+        skyColor.lerpColors(nightColor, dayColor, daylight);
         scene.background = skyColor;
         if (scene.fog instanceof THREE.Fog) scene.fog.color.copy(skyColor);
 
