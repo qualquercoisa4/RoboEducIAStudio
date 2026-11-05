@@ -1,50 +1,31 @@
 # RoboEduc IA Studio
 
-MVP do playground educacional com Next.js e Cloudflare Workers AI.
+MVP educacional construído com Next.js e WebLLM.
 
-## Provedor de IA
+## Inferência local
 
-A rota `POST /api/chat` usa o modelo `@cf/qwen/qwen2.5-coder-32b-instruct` no Cloudflare Workers AI. A rota `GET /api/status` verifica se as credenciais foram configuradas.
+O navegador executa o modelo `Qwen2-0.5B-Instruct-q4f16_1-MLC` com WebGPU. Não exige API key, conta externa ou variável secreta. As mensagens são processadas localmente.
 
-O Workers AI Free disponibiliza uma cota diária de 10.000 Neurons. Ao atingir o limite, as chamadas ficam indisponíveis até o reset; para manter o projeto no plano Free, não habilite upgrade para plano pago.
+## Primeiro uso
 
-## Variáveis de ambiente
+1. Abra o site em navegador e dispositivo compatíveis com WebGPU.
+2. Clique em **Carregar IA neste dispositivo**.
+3. Aguarde o download inicial do modelo.
+4. Envie uma mensagem.
 
-Cadastre **somente no painel da Vercel** (Settings → Environment Variables), nunca no GitHub:
+O download é feito uma vez e o navegador pode armazenar o modelo em cache. O modelo é pequeno e sua qualidade é inferior à de modelos de nuvem maiores. A compatibilidade e o desempenho dependem da GPU, memória e navegador. Alguns celulares não oferecem WebGPU.
 
-- `CLOUDFLARE_ACCOUNT_ID`
-- `CLOUDFLARE_API_TOKEN`
-
-Crie um token Cloudflare com permissão mínima `Account > Workers AI > Read`. Consulte o guia oficial: https://developers.cloudflare.com/workers-ai/get-started/rest-api/
-
-Marque Production, Preview e Development. Depois de salvar, faça um novo deploy.
-
-## Desenvolvimento local
-
-Crie `.env.local` na raiz:
-
-```env
-CLOUDFLARE_ACCOUNT_ID=seu_account_id
-CLOUDFLARE_API_TOKEN=seu_token
-```
-
-Então execute:
+## Desenvolvimento
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abra http://localhost:3000.
+## Privacidade e limitações
 
-## Segurança e limites
-
-- As credenciais são lidas apenas no servidor.
-- O endpoint limita o histórico e o tamanho das mensagens.
-- Há um limitador simples por instância (20 requisições por minuto por IP). Ele não substitui rate limiting durável ou autenticação; antes de disponibilizar para muitas turmas, adicionar autenticação, limite por usuário e proteção persistente contra abuso.
-- Não envie dados pessoais, notas, informações médicas ou dados sensíveis de alunos.
-- O histórico atual fica apenas no armazenamento local do navegador.
-
-## Hospedagem
-
-A aplicação é compatível com Vercel. O deploy requer as duas variáveis de ambiente acima. A API não chama Ollama local; a inferência é remota pelo Cloudflare.
+- A geração ocorre no próprio navegador; os prompts não são enviados a uma API de IA.
+- O primeiro carregamento baixa pesos do modelo de infraestrutura pública MLC/Hugging Face.
+- O histórico fica no armazenamento local do navegador.
+- É necessário suporte a WebGPU.
+- As rotas antigas em `app/api` são legadas e não são usadas pela interface local.
