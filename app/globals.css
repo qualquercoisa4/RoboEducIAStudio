@@ -185,3 +185,5 @@ body:has(.play-screen),body:has(.main-game-menu){overflow:hidden;background:#080
   .mc-recipe{grid-template-columns:32px minmax(0,1fr);gap:8px}
   .mc-recipe>button{grid-column:2;justify-self:start}
 }
+
+body:has(.mc-game),html:has(.mc-game){overflow:hidden;height:100%;touch-action:none}
