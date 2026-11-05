@@ -511,10 +511,12 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     const currentTarget = () => {
       raycaster.setFromCamera(center, camera);
       const hits = raycaster.intersectObjects(worldMeshes, false);
-      if (!hits.length || hits[0].instanceId === undefined) return null;
+      if (!hits.length) return null;
       const hit = hits[0];
+      const instanceId = hit.instanceId;
+      if (instanceId === undefined) return null;
       const positions = hit.object.userData.blockPositions as Array<{ x: number; y: number; z: number }>;
-      const position = positions[hit.instanceId];
+      const position = positions[instanceId];
       if (!position) return null;
       return { hit, position, type: blocks.get(keyOf(position.x, position.y, position.z)) || "bedrock" as BlockType };
     };
