@@ -49,3 +49,15 @@ body:has(.play-screen),body:has(.main-game-menu){overflow:hidden;background:#080
  .main-game-menu .menu-preview{height:22vh;width:92vw}
 }
 @media(hover:hover) and (pointer:fine){.play-screen .touch-controls{opacity:.72}.play-screen .touch-controls button:hover{background:#4598d1e8}}
+
+/* Game-specific controls and theme previews */
+.play-screen .touch-controls .attack-control{width:clamp(70px,9vw,94px);height:clamp(70px,9vw,94px);background:#d94c4cdd;border-color:#ffd0c9;font-size:clamp(11px,1.4vw,14px);margin-left:auto;margin-right:12px}
+.hud-stats{max-width:58vw;justify-content:center}
+.hud-level{max-width:min(34vw,420px);white-space:normal;line-height:1.25;text-align:center}
+.menu-preview[data-style="minecraft"]{background:linear-gradient(#8bd2fa 0 55%,#6ca84b 55% 100%)}
+.menu-preview[data-style="roblox"]{background:linear-gradient(#9be7ff 0 55%,#4bc66b 55% 100%)}
+.menu-preview[data-style="fortnite"]{background:linear-gradient(#9aa9d3 0 55%,#65738d 55% 100%)}
+.menu-preview[data-style="sonic"]{background:linear-gradient(#4da8ee 0 55%,#35b96a 55% 100%)}
+.menu-preview[data-style="sonic"] .preview-ground{background:repeating-linear-gradient(90deg,#a66a3c 0 28px,#e8b86c 28px 56px)}
+.menu-preview[data-style="minecraft"] .preview-ground{background:repeating-linear-gradient(90deg,#875b39 0 32px,#6f482e 32px 35px)}
+@media(max-width:600px){.play-screen .touch-controls .attack-control{width:64px;height:64px;margin-right:0}.hud-stats{max-width:100%;flex-wrap:wrap}.hud-level{max-width:88vw;font-size:10px}}
