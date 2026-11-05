@@ -1,6 +1,6 @@
 {
   "name": "roboeducia-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,6 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.87",
     "next": "16.4.5",
     "react": "19.2.3",
     "react-dom": "19.2.3"
