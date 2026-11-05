@@ -48,13 +48,14 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
   const collectibles=Array.from({length:12},(_,i)=>({x:260+i*225,y: i%3===0?330:i%3===1?385:285,taken:false}));
   const enemies=Array.from({length:7},(_,i)=>({x:650+i*340,y:390,dir:i%2? -1:1,min:610+i*340,max:790+i*340,alive:true,hit:0}));
   const checkpoints=[{x:760,active:false},{x:1450,active:false},{x:2180,active:false}];
-  const setResult=(win:boolean)=>{done=true;failed=!win;setWon(win);setLost(!win);};
+  const setResult=(win:boolean)=>{done=true;setWon(win);setLost(!win);};
   const keyDown=(e:KeyboardEvent)=>{const k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," ","a","d","w","x","e"].includes(k))e.preventDefault();if(k==="arrowleft"||k==="a")keys.current.left=true;if(k==="arrowright"||k==="d")keys.current.right=true;if(k===" "||k==="arrowup"||k==="w")keys.current.jump=true;if(k==="x"||k==="e")keys.current.attack=true;};
   const keyUp=(e:KeyboardEvent)=>{const k=e.key.toLowerCase();if(k==="arrowleft"||k==="a")keys.current.left=false;if(k==="arrowright"||k==="d")keys.current.right=false;if(k===" "||k==="arrowup"||k==="w")keys.current.jump=false;if(k==="x"||k==="e")keys.current.attack=false;};
   const resize=()=>{const r=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*dpr));canvas.height=Math.max(1,Math.round(r.height*dpr));};
   resize();const observer=new ResizeObserver(resize);observer.observe(canvas);
   window.addEventListener("keydown",keyDown);window.addEventListener("keyup",keyUp);
   const damage=()=>{if(player.invuln>0)return;localLives--;setLives(localLives);player.invuln=95;player.vy=-6;player.x=Math.max(0,player.x-75);if(localLives<=0)setResult(false);};
+  let raf=0;
   const draw=()=>{
    const dt=Math.min((frame&&lastTime?((performance.now()-lastTime)/16.67):1),2);lastTime=performance.now();frame++;
    const sx=canvas.width/W,sy=canvas.height/H;ctx.setTransform(sx,0,0,sy,0,0);ctx.clearRect(0,0,W,H);
