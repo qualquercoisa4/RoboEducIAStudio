@@ -259,6 +259,16 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     setFurnaceOpen(false);
   };
 
+  const closeInventory = () => {
+    inventoryOpenRef.current = false;
+    setInventoryOpen(false);
+  };
+
+  const closeCrafting = () => {
+    craftOpenRef.current = false;
+    setCraftOpen(false);
+  };
+
   const smelt = (ore: "iron_ore" | "copper_ore") => {
     const current = inventoryRef.current;
     if (current[ore] < 1 || current.coal < 1) {
@@ -590,8 +600,8 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     const spawnMob = () => {
       const angle = Math.random() * Math.PI * 2;
       const distance = 12 + Math.random() * 5;
-      const x = Math.round(player.x + Math.cos(angle) * distance);
-      const z = Math.round(player.z + Math.sin(angle) * distance);
+      const x = Math.max(-20, Math.min(20, Math.round(player.x + Math.cos(angle) * distance)));
+      const z = Math.max(-20, Math.min(20, Math.round(player.z + Math.sin(angle) * distance)));
       const y = terrainHeight(x, z) + 1;
       const group = new THREE.Group();
       const body = new THREE.Mesh(mobGeometry, mobBodyMaterial);
@@ -1088,11 +1098,11 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       </div>
 
       {inventoryOpen && (
-        <div className="mc-modal-backdrop" onClick={() => setInventoryOpen(false)}>
+        <div className="mc-modal-backdrop" onClick={closeInventory}>
           <section className="mc-panel" onClick={(event) => event.stopPropagation()}>
             <div className="mc-panel-heading">
               <div><small>MOCHILA</small><h2>Inventário</h2></div>
-              <button onClick={() => setInventoryOpen(false)}>✕</button>
+              <button onClick={closeInventory}>✕</button>
             </div>
             <div className="mc-inventory-grid">
               {(Object.keys(ITEM_NAMES) as ItemId[]).map((item) => (
@@ -1135,11 +1145,11 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       )}
 
       {craftOpen && (
-        <div className="mc-modal-backdrop" onClick={() => setCraftOpen(false)}>
+        <div className="mc-modal-backdrop" onClick={closeCrafting}>
           <section className="mc-panel mc-crafting-panel" onClick={(event) => event.stopPropagation()}>
             <div className="mc-panel-heading">
               <div><small>RECEITAS</small><h2>Fabricação</h2></div>
-              <button onClick={() => setCraftOpen(false)}>✕</button>
+              <button onClick={closeCrafting}>✕</button>
             </div>
             {RECIPES.map((recipe) => (
               <div className="mc-recipe" key={recipe.id}>
