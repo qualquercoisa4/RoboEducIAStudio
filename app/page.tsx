@@ -1,50 +1,42 @@
 "use client";
 import { useState } from "react";
 
-type Choice = { id: string; title: string; description: string; visual: string; accent: string };
-type Step = { title: string; subtitle: string; question: string; choices: Choice[] };
-const steps: Step[] = [
- { title: "Estilo visual", subtitle: "A aparência define a identidade do seu mundo.", question: "Qual será o estilo do seu jogo?", choices: [
-  {id:"voxel",title:"Mundo de blocos",description:"Construção, exploração e liberdade.",visual:"voxel",accent:"#65c99a"},
-  {id:"obby",title:"Colorido e divertido",description:"Personagens e fases cheias de obstáculos.",visual:"obby",accent:"#8b83ff"},
-  {id:"battle",title:"Ação cinematográfica",description:"Um mundo intenso, com muita aventura.",visual:"battle",accent:"#f19b65"},
-  {id:"pixel",title:"Pixel art 2D",description:"Visual retrô e personalidade própria.",visual:"pixel",accent:"#e5bd63"}
+type Option = { id: string; name: string; image: string };
+const questions = [
+ { title:"Qual vai ser o estilo?", hint:"Escolha uma imagem.", options:[
+  {id:"minecraft",name:"Minecraft",image:"https://gaming-cdn.com/images/products/5657/screenshot/minecraft-windows-10-edition-windows-10-edition-pc-jeu-microsoft-store-wallpaper-4.jpg?v=1747754625"},
+  {id:"roblox",name:"Roblox",image:"https://bk.ibxk.com.br/2022/07/13/13150328379290.jpg?ims=650x"},
+  {id:"fortnite",name:"Fortnite",image:"https://www.gamereactor.eu/media/grtv/16/471643_w926.jpg"},
+  {id:"mario",name:"Super Mario",image:"https://eu-images.contentstack.com/v3/assets/blt8bbf16c2d7a209e5/bltecdf7ea330b23c07/67fe211749f7987f04ff928a/Screenshot_2025-04-15_at_10.03.14.png"}
  ]},
- { title: "Objetivo principal", subtitle: "O que o jogador precisa fazer para vencer?", question: "Qual será o objetivo do jogo?", choices: [
-  {id:"explore",title:"Explorar um mundo",description:"Descobrir lugares, segredos e recursos.",visual:"explore",accent:"#65c99a"},
-  {id:"survive",title:"Sobreviver",description:"Resistir a perigos e ficar cada vez mais forte.",visual:"survive",accent:"#f19b65"},
-  {id:"build",title:"Construir",description:"Criar estruturas e transformar o cenário.",visual:"build",accent:"#8b83ff"},
-  {id:"challenge",title:"Completar desafios",description:"Superar fases, obstáculos e missões.",visual:"challenge",accent:"#e5bd63"}
+ { title:"O que o jogador vai fazer?", hint:"Escolha o objetivo do jogo.", options:[
+  {id:"explore",name:"Explorar",image:"https://s2-techtudo.glbimg.com/FRncuVVYu-3PBm7ub9HaTh1VDn4%3D/0x0%3A695x391/984x0/smart/filters%3Astrip_icc%28%29/i.s3.glbimg.com/v1/AUTH_08fbf48bc0524877943fe86e43087e7a/internal_photos/bs/2021/w/r/zQS09YRq2yywN0pRjTCQ/2017-02-07-caca.png"},
+  {id:"build",name:"Construir",image:"https://news.microsoft.com/wp-content/uploads/prod/sites/42/2021/04/Minecraft-Screenshot-2021.04.10-17.28.15.15-2.jpg"},
+  {id:"battle",name:"Lutar",image:"https://www.gamereactor.eu/media/grtv/16/471643_w926.jpg"},
+  {id:"race",name:"Superar fases",image:"https://eu-images.contentstack.com/v3/assets/blt8bbf16c2d7a209e5/bltecdf7ea330b23c07/67fe211749f7987f04ff928a/Screenshot_2025-04-15_at_10.03.14.png"}
  ]},
- { title: "Tipo de jogo", subtitle: "Escolha a estrutura principal da experiência.", question: "Que tipo de jogo vamos criar?", choices: [
-  {id:"platform",title:"Plataforma",description:"Pular, correr e atravessar fases.",visual:"platform",accent:"#65c99a"},
-  {id:"adventure",title:"Aventura",description:"Explorar, coletar itens e cumprir missões.",visual:"adventure",accent:"#8b83ff"},
-  {id:"defense",title:"Tower defense",description:"Defender sua base de ondas de inimigos.",visual:"defense",accent:"#f19b65"},
-  {id:"simulator",title:"Simulador",description:"Controlar sistemas e evoluir seu espaço.",visual:"simulator",accent:"#e5bd63"}
+ { title:"Qual tipo de jogo?", hint:"Escolha como será a aventura.", options:[
+  {id:"platform",name:"Plataforma",image:"https://eu-images.contentstack.com/v3/assets/blt8bbf16c2d7a209e5/bltecdf7ea330b23c07/67fe211749f7987f04ff928a/Screenshot_2025-04-15_at_10.03.14.png"},
+  {id:"adventure",name:"Aventura",image:"https://bk.ibxk.com.br/2022/07/13/13150328379290.jpg?ims=650x"},
+  {id:"survival",name:"Sobrevivência",image:"https://gaming-cdn.com/images/products/5657/screenshot/minecraft-windows-10-edition-windows-10-edition-pc-jeu-microsoft-store-wallpaper-4.jpg?v=1747754625"},
+  {id:"action",name:"Ação",image:"https://www.gamereactor.eu/media/grtv/16/471643_w926.jpg"}
  ]}
 ];
-const buildTasks = ["Interpretando suas escolhas","Montando o conceito do jogo","Preparando o mundo e os cenários","Configurando as mecânicas","Finalizando seu projeto"];
-function Visual({kind}:{kind:string}) {
- return <div className={`visual visual-${kind}`} aria-hidden="true"><div className="sun"/><div className="mountain mountain-a"/><div className="mountain mountain-b"/><div className="ground"/><div className="scene-object object-a"/><div className="scene-object object-b"/><div className="scene-object object-c"/><div className="scene-glow"/></div>;
-}
-export default function Home() {
+const stages=["Escolhas","Criação","Pronto!"];
+export default function Home(){
  const [step,setStep]=useState(0);
- const [selected,setSelected]=useState<Record<number,string>>({});
- const [building,setBuilding]=useState(false);
- const [buildProgress,setBuildProgress]=useState(0);
- const [finished,setFinished]=useState(false);
- const [projectName,setProjectName]=useState("Meu primeiro jogo");
- const current=steps[step];
- function startBuild(){setBuilding(true);setBuildProgress(0);setFinished(false);let n=0;const timer=window.setInterval(()=>{n+=1;setBuildProgress(n);if(n>=100){window.clearInterval(timer);setBuilding(false);setFinished(true);}},85);}
- function restart(){setStep(0);setSelected({});setBuilding(false);setFinished(false);setBuildProgress(0);}
- return <main className="builder-shell">
-  <header className="builder-header"><div className="builder-brand"><div className="brand-mark">✳</div><div><strong>RoboEduc <span>Game Studio</span></strong><small>LABORATÓRIO DE CRIAÇÃO</small></div></div><div className="header-right"><span className="live-dot"/> EXPERIÊNCIA INTERATIVA <div className="avatar">R</div></div></header>
-  <div className="builder-layout">
-   <aside className="progress-panel"><div className="panel-label">SEU PROJETO</div><div className="project-icon">◈</div><h3>{projectName}</h3><p>Vamos transformar suas ideias em um jogo.</p><div className="steps-list">{steps.map((s,i)=><div className={`step-item ${i===step&&!finished?"active":selected[i]?"done":""}`} key={s.title}><div className="step-number">{selected[i]?"✓":String(i+1).padStart(2,"0")}</div><div><strong>{s.title}</strong><small>{selected[i]?"Escolhido":i===step?"Em andamento":"A seguir"}</small></div></div>)}<div className={`step-item ${finished?"done":""}`}><div className="step-number">✦</div><div><strong>Construção</strong><small>{finished?"Concluído":"Etapa final"}</small></div></div></div><div className="sidebar-tip"><span>✧ DICA DO ESTÚDIO</span><p>Não existe escolha errada. Você pode experimentar diferentes combinações.</p></div></aside>
-   <section className="workspace">
-    {!building&&!finished?<><div className="workspace-top"><div><div className="eyebrow">ETAPA {step+1} <span>/</span> {steps.length}</div><div className="progress-track"><div style={{width:`${(step/steps.length)*100+8}%`}}/></div></div><span className="autosave">● PROJETO SALVO</span></div><div className="question-heading"><div className="spark">✳</div><div><h1>{current.question}</h1><p>{current.subtitle}</p></div></div><div className="choice-grid">{current.choices.map((choice,i)=><button key={choice.id} className={`choice-card ${selected[step]===choice.id?"selected":""}`} onClick={()=>setSelected({...selected,[step]:choice.id})}><div className="choice-art"><Visual kind={choice.visual}/><span className="choice-index">0{i+1}</span><span className="select-indicator">{selected[step]===choice.id?"✓":"＋"}</span></div><div className="choice-copy"><strong>{choice.title}</strong><p>{choice.description}</p></div></button>)}</div><div className="workspace-footer"><button className="text-button" onClick={()=>step>0&&setStep(step-1)} disabled={step===0}>← Voltar</button><span>{selected[step]?"Seleção pronta":"Selecione uma opção para continuar"}</span><button className="next-button" disabled={!selected[step]} onClick={()=>step<steps.length-1?setStep(step+1):startBuild()}>{step===steps.length-1?"Criar meu jogo":"Continuar"} <span>→</span></button></div></>:building?<div className="build-screen"><div className="build-orbit"><div className="orbit-ring ring-one"/><div className="orbit-ring ring-two"/><div className="orbit-core">✳</div><div className="orbit-dot dot-one"/><div className="orbit-dot dot-two"/><div className="orbit-dot dot-three"/></div><div className="eyebrow">ROBOEDUC AI ENGINE</div><h1>Estamos criando seu jogo<span className="typing-dots">...</span></h1><p>Transformando suas escolhas em uma nova experiência.</p><div className="build-progress"><div><span>CONSTRUINDO SEU MUNDO</span><strong>{buildProgress}%</strong></div><div className="progress-track"><div style={{width:`${buildProgress}%`}}/></div></div><div className="build-task-list">{buildTasks.map((task,i)=><div className={buildProgress>=(i+1)*20?"task complete":buildProgress>=i*20?"task current":"task"} key={task}><span>{buildProgress>=(i+1)*20?"✓":buildProgress>=i*20?"◌":"○"}</span>{task}</div>)}</div></div>:<div className="finished-screen"><div className="finished-icon">✦</div><div className="eyebrow">PROJETO GERADO</div><h1>Seu jogo está tomando forma!</h1><p>A primeira etapa da criação foi concluída. O próximo passo será conectar suas escolhas a um jogo realmente jogável.</p><div className="summary-grid">{steps.map((s,i)=><div className="summary-card" key={s.title}><small>{s.title}</small><strong>{s.choices.find(c=>c.id===selected[i])?.title}</strong></div>)}</div><button className="next-button" onClick={restart}>Criar outro jogo ↗</button></div>}
-   </section>
-  </div>
-  <footer className="builder-footer"><span>ROBOEDUC GAME STUDIO</span><span>IDEIAS → EXPERIÊNCIAS</span></footer>
+ const [answers,setAnswers]=useState<Record<number,string>>({});
+ const [creating,setCreating]=useState(false);
+ const [done,setDone]=useState(false);
+ const [progress,setProgress]=useState(0);
+ const q=questions[step];
+ function create(){setCreating(true);setProgress(0);let p=0;const timer=window.setInterval(()=>{p+=4;setProgress(p);if(p>=100){window.clearInterval(timer);setCreating(false);setDone(true);}},75);}
+ function reset(){setStep(0);setAnswers({});setCreating(false);setDone(false);setProgress(0);}
+ return <main className="robo-app">
+  <header className="robo-header"><div className="robo-logo"><div className="robo-word">ROBO</div><div className="educ-word"><b>E</b><b>D</b><b>U</b><b>C</b></div><small>ESCOLA DE PROGRAMAÇÃO E ROBÓTICA</small></div><span className="header-tag">GAME STUDIO</span></header>
+  <section className="creator">
+   {!creating&&!done?<><div className="step-dots">{questions.map((_,i)=><span className={i<=step?"active":""} key={i}/>)}</div><div className="question-title"><span className="question-count">PERGUNTA {step+1} DE {questions.length}</span><h1>{q.title}</h1><p>{q.hint}</p></div><div className="game-options">{q.options.map((o,i)=><button key={o.id} className={`game-option ${answers[step]===o.id?"chosen":""}`} onClick={()=>setAnswers({...answers,[step]:o.id})}><img src={o.image} alt="" loading="eager"/><span className="option-name">{o.name}</span><span className="option-check">{answers[step]===o.id?"✓":""}</span></button>)}</div><div className="creator-actions"><button className="back-button" onClick={()=>setStep(Math.max(0,step-1))} disabled={step===0}>Voltar</button><button className="continue-button" disabled={!answers[step]} onClick={()=>step<questions.length-1?setStep(step+1):create()}>{step===questions.length-1?"Criar meu jogo":"Continuar"} <span>→</span></button></div></>:creating?<div className="creation"><div className="creation-logo"><span>R</span><span>O</span><span>B</span><span>O</span><b>E</b><b>D</b><b>U</b><b>C</b></div><h1>Construindo seu jogo...</h1><div className="loader-track"><div style={{width:progress+"%"}}/></div><strong>{progress}%</strong><p>{progress<25?"Separando as peças...":progress<50?"Montando o cenário...":progress<75?"Preparando os personagens...":"Quase pronto!"}</p><div className="loader-spark">✦</div></div>:<div className="done-screen"><div className="done-mark">✓</div><h1>Seu jogo está pronto!</h1><p>Suas escolhas foram recebidas.</p><div className="chosen-summary">{questions.map((question,i)=><div key={question.title}><span>{question.title}</span><b>{question.options.find(o=>o.id===answers[i])?.name}</b></div>)}</div><button className="continue-button" onClick={reset}>Criar outro jogo ↻</button></div>}
+  </section>
+  <footer className="robo-footer">FEITO PARA APRENDER E CRIAR <span>ROBOEDUC</span></footer>
  </main>;
 }
