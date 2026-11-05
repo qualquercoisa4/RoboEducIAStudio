@@ -30,7 +30,6 @@ function PlatformGame({ gameName, onExit }: { gameName:string; onExit:()=>void }
  const [won,setWon]=useState(false);
  const [lost,setLost]=useState(false);
  const keys=useRef({left:false,right:false,jump:false});
- const resetSignal=useRef(0);
  useEffect(()=>{
   const canvas=canvasRef.current;if(!canvas)return;
   const ctx=canvas.getContext("2d");if(!ctx)return;
