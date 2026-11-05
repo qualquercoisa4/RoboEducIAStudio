@@ -81,13 +81,17 @@ function PlatformGame({ gameName, onExit }: { gameName:string; onExit:()=>void }
  },[]);
  const hold=(key:"left"|"right"|"jump",value:boolean)=>{keys.current[key]=value;};
  return <div className="play-screen">
-  <div className="play-top"><button className="back-button" onClick={onExit}>← Menu</button><strong>{gameName}</strong><span>Pontos: {score} · Vidas: {lives}</span></div>
   <canvas ref={canvasRef} width={960} height={540} className="platform-canvas"/>
-  <div className="touch-controls">
-   <div><button onPointerDown={()=>hold("left",true)} onPointerUp={()=>hold("left",false)} onPointerLeave={()=>hold("left",false)}>◀</button><button onPointerDown={()=>hold("right",true)} onPointerUp={()=>hold("right",false)} onPointerLeave={()=>hold("right",false)}>▶</button></div>
-   <button className="jump-control" onPointerDown={()=>hold("jump",true)} onPointerUp={()=>hold("jump",false)} onPointerLeave={()=>hold("jump",false)}>PULAR</button>
+  <div className="game-hud">
+   <div className="hud-brand"><span className="hud-dot"/> {gameName}</div>
+   <div className="hud-stats"><span>🟡 {score}</span><span>♥ {lives}</span><span className="hud-level">FASE 1 · 1/1</span></div>
+   <button className="hud-menu" onClick={onExit}>Ⅱ MENU</button>
   </div>
-  {(won||lost)&&<div className="game-result"><h2>{won?"Fase concluída!":"Fim de jogo"}</h2><p>Pontuação: {score}</p><button className="continue-button" onClick={onExit}>Voltar ao menu</button></div>}
+  <div className="touch-controls">
+   <div className="move-controls"><button aria-label="Mover para esquerda" onPointerDown={()=>hold("left",true)} onPointerUp={()=>hold("left",false)} onPointerCancel={()=>hold("left",false)} onPointerLeave={()=>hold("left",false)}>◀</button><button aria-label="Mover para direita" onPointerDown={()=>hold("right",true)} onPointerUp={()=>hold("right",false)} onPointerCancel={()=>hold("right",false)} onPointerLeave={()=>hold("right",false)}>▶</button></div>
+   <button className="jump-control" onPointerDown={()=>hold("jump",true)} onPointerUp={()=>hold("jump",false)} onPointerCancel={()=>hold("jump",false)} onPointerLeave={()=>hold("jump",false)}>PULAR</button>
+  </div>
+  {(won||lost)&&<div className="game-result"><div className="result-stars">{won?"★ ★ ★":"✦"}</div><h2>{won?"VOCÊ CONSEGUIU!":"FIM DE JOGO"}</h2><p>Pontuação: {score}</p><button className="continue-button" onClick={onExit}>VOLTAR AO MENU</button></div>}
  </div>;
 }
 
