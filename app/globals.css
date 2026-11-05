@@ -61,3 +61,5 @@ body:has(.play-screen),body:has(.main-game-menu){overflow:hidden;background:#080
 .menu-preview[data-style="sonic"] .preview-ground{background:repeating-linear-gradient(90deg,#a66a3c 0 28px,#e8b86c 28px 56px)}
 .menu-preview[data-style="minecraft"] .preview-ground{background:repeating-linear-gradient(90deg,#875b39 0 32px,#6f482e 32px 35px)}
 @media(max-width:600px){.play-screen .touch-controls .attack-control{width:64px;height:64px;margin-right:0}.hud-stats{max-width:100%;flex-wrap:wrap}.hud-level{max-width:88vw;font-size:10px}}
+
+.play-screen .touch-controls .build-control{background:#a87837e8;border-color:#ffe0a5;font-size:clamp(10px,1.3vw,14px);width:clamp(76px,10vw,104px);border-radius:18px}
