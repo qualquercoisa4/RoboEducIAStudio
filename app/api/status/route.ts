@@ -3,13 +3,17 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const host = (process.env.OLLAMA_HOST || "http://127.0.0.1:11434").replace(/\/$/, "");
-  try {
-    const response = await fetch(`${host}/api/tags`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
-    if (!response.ok) throw new Error("Ollama indisponível");
-    const data = await response.json() as { models?: Array<{ name: string }> };
-    return NextResponse.json({ connected: true, models: data.models?.map((m) => m.name) || [] });
-  } catch {
-    return NextResponse.json({ connected: false, models: [], message: "Ollama não está acessível neste servidor." }, { status: 503 });
-  }
+  const configured = Boolean(
+    process.env.CLOUDFLARE_ACCOUNT_ID?.trim() &&
+    process.env.CLOUDFLARE_API_TOKEN?.trim()
+  );
+
+  return NextResponse.json({
+    configured,
+    provider: "Cloudflare Workers AI",
+    model: "@cf/qwen/qwen2.5-coder-32b-instruct",
+    message: configured
+      ? "Credenciais configuradas. A conexão será validada na primeira mensagem."
+      : "Cadastre as duas variáveis secretas da Cloudflare na Vercel."
+  });
 }
