@@ -199,6 +199,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const gameOverRef = useRef(false);
   const inventoryOpenRef = useRef(false);
   const craftOpenRef = useRef(false);
+  const craftingTableAvailableRef = useRef(true);
   const [started, setStarted] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [craftOpen, setCraftOpen] = useState(false);
@@ -244,7 +245,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
 
   const craft = (recipe: Recipe) => {
     const current = inventoryRef.current;
-    if (recipe.needsTable && current.crafting_table < 1) {
+    if (recipe.needsTable && current.crafting_table < 1 && !craftingTableAvailableRef.current) {
       setNotice("Você precisa ter uma bancada de trabalho no inventário.");
       return;
     }
@@ -292,6 +293,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     gameOverRef.current = false;
     inventoryOpenRef.current = false;
     craftOpenRef.current = false;
+    craftingTableAvailableRef.current = true;
     setHud({ health: 20, hunger: 20, day: 1, clock: "08:00", night: false });
     setGameOver(false);
     setStarted(false);
@@ -615,6 +617,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       }
       putBlock(x, y, z, blockType);
       rebuildWorld();
+      if (item === "crafting_table") craftingTableAvailableRef.current = true;
       updateInventory(item, -1);
       setNotice(ITEM_NAMES[item] + " colocado.");
     };
@@ -771,11 +774,11 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
         const dayLength = 240;
         const day = Math.floor(worldSeconds / dayLength) + 1;
         const phase = (worldSeconds % dayLength) / dayLength;
-        const night = phase > 0.62 || phase < 0.08;
+        const night = phase > 0.76 || phase < 0.24;
         const hours = Math.floor(phase * 24);
         const minutes = Math.floor(((phase * 24) % 1) * 60);
         const clock = String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0");
-        const daylight = Math.max(0.12, Math.min(1, Math.sin((phase - 0.25) * Math.PI * 2) * 0.5 + 0.55));
+        const daylight = Math.max(0.12, Math.min(1, Math.sin((phase - 0.25) * Math.PI * 2) * 0.5 + 0.5));
         sun.intensity = 0.12 + daylight * 1.65;
         hemisphere.intensity = 0.22 + daylight * 1.1;
         skyColor.lerpColors(nightColor, dayColor, daylight);
