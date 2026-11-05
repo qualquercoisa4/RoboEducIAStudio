@@ -33,7 +33,7 @@ function PlatformGame({gameName,styleId,objectiveId,typeId,onExit}:{gameName:str
   const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas.getContext("2d");if(!ctx)return;
   const W=960,H=540;let raf=0,frame=0,last=0,camera=0,scoreLocal=0,livesLocal=typeId==="survival"?4:3,done=false,progressLocal=0,elapsed=0;
   const player={x:3.5,z:3.5,y:0,vx:0,vy:0,angle:0,ground:true};
-  const grid=Array.from({length:18},(_,z)=>Array.from({length:18},(_,x)=>(x===0||z===0||x===17||z===17)?1:0));
+  const grid:number[][]=Array.from({length:18},(_,z)=>Array.from({length:18},(_,x)=>(x===0||z===0||x===17||z===17)?1:0));
   // Robotics lab landmarks and collectible microchips are present in every world.
   const chips=[{x:5,z:4,taken:false},{x:10,z:5,taken:false},{x:13,z:11,taken:false},{x:4,z:13,taken:false},{x:8,z:9,taken:false},{x:14,z:7,taken:false}];
   const stations=[{x:7,z:7,built:false},{x:12,z:9,built:false},{x:5,z:11,built:false}];
