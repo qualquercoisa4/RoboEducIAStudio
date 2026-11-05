@@ -374,21 +374,25 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     scene.add(sun);
 
     const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const blockMaterials: Record<BlockType, THREE.MeshLambertMaterial> = {} as Record<BlockType, THREE.MeshLambertMaterial>;
+    const blockMaterials: Record<BlockType, THREE.Material | THREE.Material[]> = {} as Record<BlockType, THREE.Material | THREE.Material[]>;
     const blockTextures: THREE.CanvasTexture[] = [];
-    const makePixelTexture = (type: BlockType) => {
+    const makePixelTexture = (type: BlockType, face: "side" | "top" | "bottom" = "side") => {
       const canvas = document.createElement("canvas");
       canvas.width = 16;
       canvas.height = 16;
       const context = canvas.getContext("2d");
       if (!context) return null;
-      const base = BLOCK_COLORS[type];
+      let base = BLOCK_COLORS[type];
+      if (type === "grass" && face === "side") base = 0x89603c;
+      if (type === "grass" && face === "bottom") base = 0x89603c;
+      if (type === "oak_log" && (face === "top" || face === "bottom")) base = 0xd4ad70;
+      if (type === "leaves") base = 0x438b43;
       const red = (base >> 16) & 255;
       const green = (base >> 8) & 255;
       const blue = base & 255;
       context.fillStyle = "rgb(" + red + "," + green + "," + blue + ")";
       context.fillRect(0, 0, 16, 16);
-      const salt = type.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+      const salt = type.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) + face.length * 17;
       for (let i = 0; i < 74; i++) {
         const px = Math.floor(seeded(salt, i, 3) * 16);
         const py = Math.floor(seeded(salt, i, 7) * 16);
@@ -399,6 +403,32 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
         context.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
         context.fillRect(px, py, 1 + (i % 7 === 0 ? 1 : 0), 1);
       }
+      if (type === "grass" && face === "side") {
+        context.fillStyle = "#619d3e";
+        context.fillRect(0, 0, 16, 3);
+        context.fillStyle = "#7cba4a";
+        context.fillRect(0, 3, 16, 1);
+        for (let x = 0; x < 16; x += 3) {
+          context.fillStyle = seeded(salt, x, 21) > 0.5 ? "#4c8d36" : "#80bd50";
+          context.fillRect(x, 1, 1, 2);
+        }
+      }
+      if (type === "oak_log" && (face === "top" || face === "bottom")) {
+        context.strokeStyle = "#986c3e";
+        context.lineWidth = 1;
+        context.strokeRect(2, 2, 12, 12);
+        context.strokeRect(5, 5, 6, 6);
+        context.fillStyle = "#e7c58a";
+        context.fillRect(7, 7, 2, 2);
+      }
+      if (type === "leaves") {
+        for (let i = 0; i < 22; i++) {
+          const px = Math.floor(seeded(salt, i, 41) * 15);
+          const py = Math.floor(seeded(salt, i, 43) * 15);
+          context.fillStyle = i % 2 ? "#2f7339" : "#68a84a";
+          context.fillRect(px, py, 2, 2);
+        }
+      }
       const texture = new THREE.CanvasTexture(canvas);
       texture.magFilter = THREE.NearestFilter;
       texture.minFilter = THREE.NearestMipmapNearestFilter;
@@ -407,12 +437,17 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       return texture;
     };
     (Object.keys(BLOCK_COLORS) as BlockType[]).forEach((type) => {
-      blockMaterials[type] = new THREE.MeshLambertMaterial({
-        map: makePixelTexture(type),
+      const material = (face: "side" | "top" | "bottom") => new THREE.MeshLambertMaterial({
+        map: makePixelTexture(type, face),
         color: 0xffffff,
         transparent: type === "leaves",
         opacity: type === "leaves" ? 0.92 : 1,
       });
+      blockMaterials[type] = type === "grass"
+        ? [material("side"), material("side"), material("top"), material("bottom"), material("side"), material("side")]
+        : type === "oak_log"
+          ? [material("side"), material("side"), material("top"), material("bottom"), material("side"), material("side")]
+          : material("side");
     });
 
     const blocks = new Map<string, BlockType>();
@@ -897,7 +932,10 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       scene.clear();
       cubeGeometry.dispose();
       highlightGeometry.dispose();
-      Object.values(blockMaterials).forEach((material) => material.dispose());
+      Object.values(blockMaterials).forEach((material) => {
+        if (Array.isArray(material)) material.forEach((faceMaterial) => faceMaterial.dispose());
+        else material.dispose();
+      });
       blockTextures.forEach((texture) => texture.dispose());
       mobGeometry.dispose();
       mobHeadGeometry.dispose();
