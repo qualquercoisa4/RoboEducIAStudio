@@ -234,14 +234,20 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const toggleInventory = () => {
     const next = !inventoryOpenRef.current;
     inventoryOpenRef.current = next;
-    if (next) { craftOpenRef.current = false; setCraftOpen(false); }
+    if (next) {
+      craftOpenRef.current = false; setCraftOpen(false);
+      furnaceOpenRef.current = false; setFurnaceOpen(false);
+    }
     setInventoryOpen(next);
   };
 
   const toggleCrafting = () => {
     const next = !craftOpenRef.current;
     craftOpenRef.current = next;
-    if (next) { inventoryOpenRef.current = false; setInventoryOpen(false); }
+    if (next) {
+      inventoryOpenRef.current = false; setInventoryOpen(false);
+      furnaceOpenRef.current = false; setFurnaceOpen(false);
+    }
     setCraftOpen(next);
   };
 
