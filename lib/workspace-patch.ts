@@ -66,7 +66,6 @@ export function validateProjectFiles(input: unknown): WorkspaceFileSnapshot[] {
 
 function extractWorkspaceJson(raw: string): string {
   const value = raw.trim();
-  const fence = String.fromCharCode(96).repeat(3);
   const fenced = value.match(/^\x60{3}(?:json)?\s*([\s\S]*?)\s*\x60{3}$/i);
   if (fenced) return fenced[1].trim();
 
@@ -81,7 +80,7 @@ function extractWorkspaceJson(raw: string): string {
     const char = value[index];
     if (inString) {
       if (escaped) escaped = false;
-      else if (char === "\\\\") escaped = true;
+      else if (char === "\\") escaped = true;
       else if (char === '"') inString = false;
       continue;
     }
