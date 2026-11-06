@@ -290,17 +290,22 @@ async function callModel(
   systemInstruction: string,
   maxTokens: number,
   signal: AbortSignal,
-  timeoutMs = 40_000
+  timeoutMs = 40_000,
+  selectedModel = "cloudflare"
 ): Promise<string> {
-  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${MODEL}`;
+  const useOpenRouter = selectedModel !== "cloudflare";
+  const endpoint = useOpenRouter
+    ? "https://openrouter.ai/api/v1/chat/completions"
+    : `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${MODEL}`;
+  const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
   let upstream: Response;
   try {
     upstream = await fetch(endpoint, {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers: { Authorization: `Bearer ${useOpenRouter ? openRouterKey : apiToken}`, "Content-Type": "application/json", Accept: "text/event-stream" },
     body: JSON.stringify({
       messages: [{ role: "system", content: systemInstruction }, ...messages],
-      max_tokens: maxTokens,
+      ...(useOpenRouter ? { model: selectedModel, max_tokens: maxTokens } : { max_tokens: maxTokens }),
       temperature: 0.2,
       top_p: 0.85,
       stream: true
@@ -320,12 +325,13 @@ async function callModel(
     const payload = await upstream.json().catch(() => null) as CloudflareError | null;
     const detail = payload?.errors?.map(item => item.message).filter(Boolean).join("; ") ||
       payload?.messages?.map(item => item.message).filter(Boolean).join("; ") ||
-      `Cloudflare retornou HTTP ${upstream.status}.`;
+      (payload as { error?: { message?: string } } | null)?.error?.message ||
+      `${useOpenRouter ? "OpenRouter" : "Cloudflare"} retornou HTTP ${upstream.status}.`;
     console.error("Workers AI error:", upstream.status, detail);
     const error = new Error(upstream.status === 401
-      ? "Token Cloudflare inválido ou sem permissão Workers AI - Read."
+      ? (useOpenRouter ? "Chave OpenRouter inválida. Confira OPENROUTER_API_KEY na Vercel." : "Token Cloudflare inválido ou sem permissão Workers AI - Read.")
       : upstream.status === 429
-        ? "Limite de uso da IA atingido. Tente novamente mais tarde."
+        ? "Limite de uso ou cota do provedor atingido. Tente novamente mais tarde."
         : detail);
     (error as Error & { status?: number }).status = upstream.status;
     throw error;
@@ -353,7 +359,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json() as { messages?: ChatMessage[]; systemInstruction?: string; mode?: WorkMode };
+    const body = await request.json() as { messages?: ChatMessage[]; systemInstruction?: string; mode?: WorkMode; model?: string };
+    const allowedModels = ["cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free"];
+    const selectedModel = typeof body.model === "string" && allowedModels.includes(body.model) ? body.model : "cloudflare";
+    if (selectedModel !== "cloudflare" && !process.env.OPENROUTER_API_KEY?.trim()) {
+      return NextResponse.json({ error: "Para usar modelos OpenRouter, cadastre OPENROUTER_API_KEY nas variáveis de ambiente da Vercel." }, { status: 503 });
+    }
     if (!Array.isArray(body.messages) || body.messages.length === 0) {
       return NextResponse.json({ error: "Envie ao menos uma mensagem." }, { status: 400 });
     }
@@ -388,7 +399,7 @@ export async function POST(request: Request) {
 
       let answer = await callModel(accountId, apiToken, messages, runtimeRepair
         ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
-        : systemInstruction, maxTokens, signal, runtimeRepair ? 48_000 : mode === "deep" ? 36_000 : 40_000);
+        : systemInstruction, maxTokens, signal, runtimeRepair ? 48_000 : mode === "deep" ? 36_000 : 40_000, selectedModel);
       if (!answer.trim()) throw new Error("O modelo encerrou a geração sem retornar texto. Tente novamente.");
 
       if (isLikelyCodeTask(messages, answer)) {
@@ -409,7 +420,8 @@ export async function POST(request: Request) {
               REVIEW_SYSTEM,
               640,
               signal,
-              7_000
+              7_000,
+              selectedModel
             );
             const report = parseReviewReport(audit);
             if (report?.needsFix) findings.push(...report.findings);
@@ -435,7 +447,7 @@ export async function POST(request: Request) {
           try {
             const repaired = await callModel(accountId, apiToken, repairMessages,
               systemInstruction + "\\n\\nCORREÇÃO OBJETIVA: preserve o código e corrija somente os problemas apontados. Retorne o arquivo completo, sem auditoria adicional.",
-              repairTokens, signal, 8_000);
+              repairTokens, signal, 8_000, selectedModel);
             if (repaired.trim()) {
               const remainingIssues = inspectCode(repaired);
               if (remainingIssues.length) {
