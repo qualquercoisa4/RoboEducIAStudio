@@ -17,10 +17,10 @@ test("embeds local CSS paths with relative prefixes and query strings", () => {
   assert.doesNotMatch(result, /href="\.\/src\/style\.css\?v=2"/);
 });
 
-test("embeds local JavaScript paths and preserves safe script attributes", () => {
-  const html = '<html><head></head><body><script defer src="/src/main.js"></script></body></html>';
+test("embeds local JavaScript paths and preserves module type", () => {
+  const html = '<html><head></head><body><script type="module" src="/src/main.js"></script></body></html>';
   const result = buildWorkspacePreview(html, [{ path: "src/main.js", content: "window.gameReady = true;" }]);
-  assert.match(result, /<script defer data-roboeduc-file="src\/main\.js">/);
+  assert.match(result, /<script type="module" data-roboeduc-file="src\/main\.js">/);
   assert.match(result, /window\.gameReady = true;/);
   assert.doesNotMatch(result, /src="\/src\/main\.js"/);
 });
