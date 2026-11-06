@@ -90,7 +90,7 @@ export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[
     if (!src) return tag;
     const path = normalizeVirtualPath(src);
     const file = path ? byPath.get(path.toLowerCase()) : undefined;
-    if (!file || !/\\.(?:m?js|cjs)$/i.test(file.path)) return tag;
+    if (!file || !/\.(?:m?js|cjs)$/i.test(file.path)) return tag;
 
     const openingTag = tag.match(/^<script\b([^>]*)>/i)?.[1] ?? "";
     const attributes = openingTag
