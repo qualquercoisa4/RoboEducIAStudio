@@ -196,6 +196,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const inventoryRef = useRef<Record<ItemId, number>>({ ...STARTING_INVENTORY });
   const selectedRef = useRef(0);
   const actionsRef = useRef<{ mine?: () => void; place?: () => void; eat?: () => void; interact?: () => void }>({});
+  const eatAppleRef = useRef<() => void>(() => {});
   const [inventory, setInventory] = useState<Record<ItemId, number>>({ ...STARTING_INVENTORY });
   const [selected, setSelected] = useState(0);
   const [hud, setHud] = useState({ health: 20, hunger: 20, day: 1, clock: "08:00", night: false });
@@ -371,6 +372,10 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     setFurnaceOpen(false);
     setRestart((value) => value + 1);
   };
+
+  useEffect(() => {
+    eatAppleRef.current = eatApple;
+  });
 
   const eatApple = () => {
     const current = inventoryRef.current;
@@ -748,7 +753,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
         setNotice("Aponte para uma bancada ou fornalha para interagir.");
       }
     };
-    const eatSelected = () => eatApple();
+    const eatSelected = () => eatAppleRef.current();
     actionsRef.current = { mine: mineBlock, place: placeBlock, eat: eatSelected, interact };
 
     const updateCamera = () => {
