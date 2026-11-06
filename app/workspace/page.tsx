@@ -79,7 +79,6 @@ export default function WorkspacePage(){
   }
  };
  useEffect(()=>{projectRef.current=project},[project]);
- useEffect(()=>{setPreviewErrors([]);setPreviewReady(false)},[project.files]);
  useEffect(()=>{
   const onPreviewMessage=(event:MessageEvent)=>{
    if(event.source!==previewFrameRef.current?.contentWindow)return;
