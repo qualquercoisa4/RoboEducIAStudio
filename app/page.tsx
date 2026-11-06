@@ -18,76 +18,80 @@ const starters = [
 ];
 const SYSTEM = "Você é o RoboEduc AI, assistente educacional especializado em tecnologia, robótica, eletrônica, programação, ciências e criação de projetos. Responda em português brasileiro, com precisão e exemplos práticos. Ao gerar código, forneça soluções completas, explique onde salvar e como executar. Se não souber, diga que não sabe. Não invente testes ou resultados.";
 const titleOf = (s: string) => s.trim().replace(/\s+/g, " ").slice(0, 42) || "Nova conversa";
-const EMPTY_HISTORY: Conversation[] = [];
-let historyCacheRaw: string | null | undefined;
-let historyCache: Conversation[] = EMPTY_HISTORY;
+const conversationHistoryStore = (() => {
+  const emptyHistory: Conversation[] = [];
+  let cachedRaw: string | null | undefined;
+  let cachedHistory: Conversation[] = emptyHistory;
 
-function getConversationHistory(): Conversation[] {
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(KEY);
-  } catch {
-    return historyCache;
-  }
-  if (raw === historyCacheRaw) return historyCache;
-  historyCacheRaw = raw;
-  if (!raw) {
-    historyCache = EMPTY_HISTORY;
-    return historyCache;
-  }
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) {
-      historyCache = parsed as Conversation[];
-      return historyCache;
+  function getSnapshot(): Conversation[] {
+    let raw: string | null;
+    try {
+      raw = localStorage.getItem(KEY);
+    } catch {
+      return cachedHistory;
     }
-  } catch {
-    // Invalid saved history is discarded below.
+    if (raw === cachedRaw) return cachedHistory;
+    cachedRaw = raw;
+    if (!raw) {
+      cachedHistory = emptyHistory;
+      return cachedHistory;
+    }
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        cachedHistory = parsed as Conversation[];
+        return cachedHistory;
+      }
+    } catch {
+      // Invalid saved history is discarded below.
+    }
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      // Keep the in-memory empty history when browser storage is unavailable.
+    }
+    cachedRaw = null;
+    cachedHistory = emptyHistory;
+    return cachedHistory;
   }
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    // Keep the in-memory empty history when browser storage is unavailable.
+
+  function getServerSnapshot(): Conversation[] {
+    return emptyHistory;
   }
-  historyCacheRaw = null;
-  historyCache = EMPTY_HISTORY;
-  return historyCache;
-}
 
-function getServerConversationHistory(): Conversation[] {
-  return EMPTY_HISTORY;
-}
+  function subscribe(callback: () => void) {
+    window.addEventListener("storage", callback);
+    window.addEventListener("roboeduc-history-change", callback);
+    return () => {
+      window.removeEventListener("storage", callback);
+      window.removeEventListener("roboeduc-history-change", callback);
+    };
+  }
 
-function subscribeToConversationHistory(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener("roboeduc-history-change", callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("roboeduc-history-change", callback);
-  };
-}
-
-
-export default function Home() {
-  const items = useSyncExternalStore(subscribeToConversationHistory, getConversationHistory, getServerConversationHistory);
-  const setItems = (update: Conversation[] | ((previous: Conversation[]) => Conversation[])) => {
-    const previous = getConversationHistory();
-    const next = typeof update === "function" ? update(previous) : update;
+  function update(updateValue: Conversation[] | ((previous: Conversation[]) => Conversation[])) {
+    const previous = getSnapshot();
+    const next = typeof updateValue === "function" ? updateValue(previous) : updateValue;
     const serialized = JSON.stringify(next);
     try {
       if (next.length) localStorage.setItem(KEY, serialized);
       else localStorage.removeItem(KEY);
-      historyCacheRaw = next.length ? serialized : null;
+      cachedRaw = next.length ? serialized : null;
     } catch {
       try {
-        historyCacheRaw = localStorage.getItem(KEY);
+        cachedRaw = localStorage.getItem(KEY);
       } catch {
-        historyCacheRaw = null;
+        cachedRaw = null;
       }
     }
-    historyCache = next.length ? next : EMPTY_HISTORY;
+    cachedHistory = next.length ? next : emptyHistory;
     window.dispatchEvent(new Event("roboeduc-history-change"));
-  };
+  }
+
+  return { getSnapshot, getServerSnapshot, subscribe, update };
+})();
+export default function Home() {
+  const items = useSyncExternalStore(conversationHistoryStore.subscribe, conversationHistoryStore.getSnapshot, conversationHistoryStore.getServerSnapshot);
+  const setItems = conversationHistoryStore.update;
   const [activeId, setActiveId] = useState("");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
