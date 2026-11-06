@@ -315,13 +315,13 @@ function inspectCode(answer: string): string[] {
   return [...new Set(issues)];
 }
 
-function toEvents(execute: (send: (event: ProgressEvent | TokenEvent | ErrorEvent | { type: "done" }) => void, signal: AbortSignal) => Promise<void>, requestSignal: AbortSignal) {
+function toEvents(execute: (send: (event: ProgressEvent | TokenEvent | ErrorEvent | { type: "done" } | { type: "reset" }) => void, signal: AbortSignal) => Promise<void>, requestSignal: AbortSignal) {
   const encoder = new TextEncoder();
   const aborter = new AbortController();
   const signal = AbortSignal.any([requestSignal, aborter.signal]);
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const send = (event: ProgressEvent | TokenEvent | ErrorEvent | { type: "done" }) => {
+      const send = (event: ProgressEvent | TokenEvent | ErrorEvent | { type: "done" } | { type: "reset" }) => {
         try {
           controller.enqueue(encoder.encode("data: " + JSON.stringify(event) + "\n\n"));
         } catch {
