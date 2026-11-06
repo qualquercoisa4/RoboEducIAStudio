@@ -403,7 +403,7 @@ export async function POST(request: Request) {
         }
 
         const uniqueFindings = [...new Set(findings)];
-        if (uniqueFindings.length) {
+        if (uniqueFindings.length && !runtimeRepair) {
           status("repair", "A revisão encontrou possíveis falhas. Solicitando uma correção antes da entrega.");
           const repairMessages: ChatMessage[] = [
             ...messages,
@@ -434,6 +434,9 @@ export async function POST(request: Request) {
             status("warning", "A geração foi preservada, mas a etapa de correção automática não terminou a tempo.");
             answer += "\\n\\n> A revisão automática não conseguiu concluir a correção dentro do tempo disponível. Teste o código no executor e envie eventuais erros para a IA.";
           }
+        } else if (uniqueFindings.length && runtimeRepair) {
+          status("warning", "A correção foi gerada, mas a revisão estática ainda encontrou um alerta. Teste novamente no executor.");
+          answer += "\\n\\n> Observação: a revisão estática ainda sinaliza: " + uniqueFindings.join(", ") + ".";
         } else {
           status("reviewed", mode === "deep"
             ? "A revisão estática e a auditoria adicional não identificaram falhas concretas."
