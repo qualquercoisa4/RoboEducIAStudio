@@ -372,6 +372,7 @@ async function callModel(
   if (!selectedKey) throw new Error("A chave de API do provedor " + providerName + " não está configurada na Vercel.");
   if (!useOpenRouter && !useOpenAI && !useGemini && !accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID não está configurado na Vercel.");
   const geminiModel = useGemini ? selectedModel.slice("gemini:".length) : "";
+  const openRouterModel = selectedModel.startsWith("openrouter:") ? selectedModel.slice("openrouter:".length) : selectedModel;
   const endpoint = useGemini
     ? "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(geminiModel) + ":streamGenerateContent?alt=sse"
     : useOpenAI
@@ -390,7 +391,7 @@ async function callModel(
         ...(useOpenAI
           ? { model: "gpt-5.6-luna", max_completion_tokens: maxTokens }
           : useOpenRouter
-            ? { model: selectedModel, max_tokens: maxTokens }
+            ? { model: openRouterModel, max_tokens: maxTokens }
             : { max_tokens: maxTokens }),
         ...(!useOpenAI ? { temperature: 0.2, top_p: 0.85 } : {}),
         ...(useOpenRouter && useWebSearch ? { tools: [{ type: "openrouter:web_search" }] } : {}),
@@ -452,8 +453,8 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json() as { messages?: ChatMessage[]; systemInstruction?: string; mode?: WorkMode; model?: string; webSearch?: boolean };
-    const allowedModels = ["cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free", "openai:gpt-5.6-luna", "gemini:gemini-3.8-flash"];
-    const selectedModel = typeof body.model === "string" && allowedModels.includes(body.model) ? body.model : "cloudflare";
+    const allowedModels = ["openrouter:qwen/qwen3-coder-next", "cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free", "openai:gpt-5.6-luna", "gemini:gemini-3.8-flash"];
+    const selectedModel = typeof body.model === "string" && allowedModels.includes(body.model) ? body.model : "openrouter:qwen/qwen3-coder-next";
     if (selectedModel === "cloudflare" && (!accountId || !apiToken)) {
       return NextResponse.json({ error: "Para usar Cloudflare, configure CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN na Vercel." }, { status: 503 });
     }
@@ -463,7 +464,7 @@ export async function POST(request: Request) {
     if (selectedModel === "openai:gpt-5.6-luna" && !process.env.OPENAI_API_KEY?.trim()) {
       return NextResponse.json({ error: "Para usar GPT-5.6 Luna, configure OPENAI_API_KEY na Vercel. A cobrança é feita por tokens na conta da OpenAI." }, { status: 503 });
     }
-    if (selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:") && !process.env.OPENROUTER_API_KEY?.trim()) {
+    if ((selectedModel.startsWith("openrouter:") || (selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:"))) && !process.env.OPENROUTER_API_KEY?.trim()) {
       return NextResponse.json({ error: "Para usar modelos OpenRouter, cadastre OPENROUTER_API_KEY nas variáveis de ambiente da Vercel." }, { status: 503 });
     }
     if (!Array.isArray(body.messages) || body.messages.length === 0) {
