@@ -49,7 +49,6 @@ export default function Home() {
         if (Array.isArray(parsed)) {
           // Restore client-only conversation history after mount.
           setItems(parsed);
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setActiveId(parsed[0]?.id ?? "");
         }
       }
