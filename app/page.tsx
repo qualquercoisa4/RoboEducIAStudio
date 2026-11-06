@@ -53,7 +53,7 @@ export default function Home() {
     } catch {
       localStorage.removeItem(KEY);
     }
-    fetch("/api/status")
+    fetch("/api/status", { cache: "no-store" })
       .then(response => response.json())
       .then(data => { setCloudReady(Boolean(data.configured)); setOpenRouterReady(Boolean(data.openrouterConfigured)); setOpenAIReady(Boolean(data.openaiConfigured)); setGeminiReady(Boolean(data.geminiConfigured)); })
       .catch(() => setCloudReady(false));
@@ -309,12 +309,11 @@ export default function Home() {
             <label htmlFor="model-choice">MODELO</label>
             <select id="model-choice" value={selectedModel} onChange={event => setSelectedModel(event.target.value)} disabled={loading}>
               <option value="cloudflare">Qwen3 30B · Cloudflare</option>
-              <option value="recursive/flint-v1.0:free" disabled={!openRouterReady}>Flint · OpenRouter grátis</option>
-              <option value="cohere/north-mini-code:free" disabled={!openRouterReady}>North Mini Code · OpenRouter grátis</option>
-              <option value="nvidia/nemotron-3-ultra-550b-a55b:free" disabled={!openRouterReady}>Nemotron 3 Ultra · OpenRouter grátis</option>
-              <option value="google/gemma-4-31b-it:free" disabled={!openRouterReady}>Gemma 4 31B · OpenRouter grátis</option>
-              <option value="gemini:gemini-3.8-flash" disabled={!geminiReady}>Gemini 3.8 Flash · Google (nível gratuito)</option>
-              <option value="openai:gpt-5.6-luna" disabled={!openAIReady}>GPT-5.6 Luna · OpenAI API (pago por uso)</option>
+              <option value="recursive/flint-v1.0:free">Flint · OpenRouter grátis</option>
+              <option value="cohere/north-mini-code:free">North Mini Code · OpenRouter grátis</option>
+              <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra · OpenRouter grátis</option>
+              <option value="google/gemma-4-31b-it:free">Gemma 4 31B · OpenRouter grátis</option>
+              <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash · Google (nível gratuito)</option>
             </select>
             <small>{selectedModel === "cloudflare" ? "Cloudflare Workers AI" : selectedModel === "openai:gpt-5.6-luna" ? (openAIReady ? "OpenAI API · cobrança por tokens" : "Configure OPENAI_API_KEY na Vercel para liberar o modelo") : selectedModel.startsWith("gemini:") ? (geminiReady ? "Google Gemini API · Free Tier sujeito a cotas" : "Configure GEMINI_API_KEY na Vercel para liberar o modelo") : openRouterReady ? "OpenRouter · disponibilidade e limites variam por modelo" : "Configure OPENROUTER_API_KEY na Vercel para liberar os modelos"}</small>
           </div>
