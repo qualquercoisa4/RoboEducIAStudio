@@ -2,19 +2,19 @@
 
 Aplicação educacional com chatbot RoboEduc IA na página inicial e Game Studio em `/studio`.
 
-## IA local (sem chave de API)
+## IA local sem chave de API
 
-O chatbot usa WebLLM para executar um modelo Qwen diretamente no navegador via WebGPU. Não exige conta de provedor, token de API ou servidor de inferência. O modelo é baixado no primeiro uso e armazenado em cache pelo navegador.
+O chatbot executa o modelo aberto `onnx-community/Qwen2.5-Coder-0.5B-Instruct` diretamente no navegador usando Transformers.js e WebGPU quando disponível. Não exige conta de provedor, token de API nem servidor de inferência.
 
-- Dispositivos com memória reportada até 4 GB: Qwen2 0.5B quantizado.
-- Outros dispositivos: Qwen2 1.5B quantizado.
-- É necessário navegador compatível com WebGPU (Chrome/Edge atualizado em hardware compatível).
-- A primeira inicialização pode baixar centenas de MB ou mais. A geração usa GPU local; velocidade e qualidade variam conforme o dispositivo.
-- As conversas ficam no armazenamento local do navegador. Com o modo local ativo, as mensagens não são enviadas a um serviço de inferência.
+- O modelo é quantizado em 4 bits e baixado no primeiro uso.
+- O navegador armazena os arquivos do modelo em cache para usos seguintes.
+- Em dispositivos sem WebGPU, o runtime tenta usar CPU/WASM; a geração será mais lenta.
+- As mensagens são processadas localmente no dispositivo quando a IA local está ativa.
+- O modelo é compacto; não tem a capacidade de modelos grandes hospedados na nuvem.
 
 ## IA Cloudflare opcional
 
-Se `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN` estiverem configurados na Vercel, a rota de servidor continua disponível como alternativa de modelo maior.
+Se `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN` estiverem configurados na Vercel, a rota de servidor continua disponível como alternativa de maior capacidade.
 
 ## Game Studio
 
