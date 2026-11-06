@@ -62,7 +62,47 @@ PADRÃO DE QUALIDADE ROBOEDUC:
 - Nunca diga que executou o código ou que ele está livre de bugs sem ter ocorrido uma execução real. Informe quando a validação foi apenas estática.
 - Prefira uma implementação menor e funcional a uma solução ambiciosa e incompleta.
 - Não exponha raciocínio interno privado. Forneça apenas uma explicação resumida das decisões e verificações relevantes.
+- Para jogos e interfaces interativas, implemente primeiro um ciclo completo e funcional; não entregue apenas uma cena visual.
+- Em jogos 3D, mantenha uma única fonte de verdade para a posição do jogador e atualize a câmera a cada frame para acompanhar o jogador.
+- Em jogos mobile, use Pointer Events quando possível, trate pointerdown, pointerup, pointercancel e lostpointercapture e impeça que botões de ação também controlem a câmera.
+- Em jogos com blocos, mantenha coordenadas inteiras e evite blocos duplicados. Para posicionar um bloco, use a face atingida e sua normal para escolher a célula adjacente; nunca replique o bloco na mesma posição.
+- Em movimento 3D, normalize vetores diagonais, mova em relação à orientação da câmera e resolva colisões por eixo. Implemente gravidade, chão e pulo com estados consistentes.
+- Antes de entregar, faça uma checagem requisito por requisito: movimento, câmera, colisão, interação, controles, redimensionamento e estado inicial.
+- Prefira mecânicas implementadas e testáveis a promessas. Não inclua botões decorativos sem comportamento.
 `;
+
+function getTaskPlaybook(messages: ChatMessage[]) {
+  const latest = [...messages].reverse().find(message => message.role === "user")?.content ?? "";
+  if (/\b(minecraft|voxel|blocos 3d|mundo 3d|three\.?(?:js)?|raycast|primeira pessoa)\b/i.test(latest)) {
+    return "\n\nPLAYBOOK DE ENGENHARIA — JOGO 3D / VOXEL:\n" +
+      "- Arquitetura mínima: cena, câmera, renderer, estado do jogador, mundo em coordenadas inteiras, loop de atualização e camada de controles.\n" +
+      "- Câmera: posicione-a na altura dos olhos e atualize sua posição/orientação a partir do jogador em todo frame. Movimento do jogador sem atualização da câmera é um defeito crítico.\n" +
+      "- Movimento: calcule frente/lateral a partir do yaw da câmera, normalize a direção, aplique deltaTime e mantenha velocidade consistente em diferentes FPS.\n" +
+      "- Controles: teclado para desktop; no celular, botões mantidos pressionados com Pointer Events e rotação de câmera por arrasto em uma área separada.\n" +
+      "- Física: AABB do jogador, colisão separada nos eixos X/Z, gravidade no eixo Y, detecção de chão e pulo apenas quando grounded.\n" +
+      "- Blocos: armazene-os em Map/Set por coordenada inteira. Quebrar remove a célula atingida. Colocar usa hit.face.normal para inserir exatamente na célula vizinha e checa se não sobrepõe o jogador.\n" +
+      "- Raycasting: limite a distância de interação; destaque o bloco selecionado; não permita colocar um bloco na mesma posição do bloco selecionado.\n" +
+      "- Não use uma esfera como substituto do jogador se o pedido exige primeira pessoa.\n" +
+      "- Inclua uma checklist curta de teste manual. Se não executou o jogo, declare que a validação foi estática."; 
+  }
+  if (/\b(jogo|game|plataforma|personagem|colis[aã]o|moviment|controles mobile)\b/i.test(latest)) {
+    return "\n\nPLAYBOOK DE ENGENHARIA — JOGO INTERATIVO:\n" +
+      "- Modele estados explícitos quando aplicável.\n" +
+      "- Use deltaTime para movimento independente de FPS, normalize movimento diagonal e trate colisões antes de confirmar a nova posição.\n" +
+      "- Separe input, atualização de física, regras do jogo e renderização.\n" +
+      "- Cada controle visível deve ter uma ação funcional e estados de pressionado/liberado; considere teclado, mouse e toque.\n" +
+      "- Verifique limites da tela, reinício, pausa, vitória/derrota e redimensionamento."; 
+  }
+  if (/\b(html|css|javascript|typescript|site|aplicativo|interface|formul[aá]rio)\b/i.test(latest)) {
+    return "\n\nPLAYBOOK DE ENGENHARIA — WEB:\n" +
+      "- Construa a interface responsiva e funcional em telas pequenas e grandes.\n" +
+      "- Garanta que todos os botões, formulários, links e estados tenham comportamento real.\n" +
+      "- Evite dependências externas desnecessárias; quando usar CDN, informe o que precisa carregar.\n" +
+      "- Trate erros, estados vazios, validação de entrada e acessibilidade básica.\n" +
+      "- Verifique IDs, seletores, listeners, ordem de inicialização e referências DOM após alterações de HTML."; 
+  }
+  return "";
+}
 
 function getClientIp(request: Request) {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -202,6 +242,18 @@ function inspectCode(answer: string): string[] {
     }
 
     if (isHtml) {
+      const hasThreeCamera = /new\s+THREE\.PerspectiveCamera/i.test(code);
+      const hasPlayerMovement = /player\.position\.(?:x|y|z)\s*[+\-]?=/i.test(code) || /player\.position\.add/i.test(code);
+      const cameraTracksPlayer = /camera\.position\.(?:copy|set)\s*\(/i.test(code) || /player\.add\(\s*camera\s*\)/i.test(code) || /camera\.position\.y\s*=\s*player\.position\.y/i.test(code);
+      if (hasThreeCamera && hasPlayerMovement && !cameraTracksPlayer) {
+        issues.push("possível falha de câmera: o jogador se move, mas a câmera não parece acompanhar sua posição");
+      }
+      if (/new\s+THREE\.Raycaster/i.test(code) && /(?:place|colocar|build)/i.test(code) && !/(?:face\.normal|normal\.clone|intersect\.face)/i.test(code)) {
+        issues.push("colocação de blocos pode usar a posição do bloco atingido em vez da célula adjacente à face selecionada");
+      }
+      if (/touchstart|touchend/i.test(code) && /(?:moveSpeed|player\.position|keys\[)/i.test(code) && !/pointerdown|pointerup/i.test(code)) {
+        issues.push("controles por toque sem Pointer Events; podem falhar em mouse, cancelamento de toque ou multitouch");
+      }
       const openScripts = (code.match(/<script\b/gi) ?? []).length;
       const closeScripts = (code.match(/<\/script\s*>/gi) ?? []).length;
       if (openScripts !== closeScripts) issues.push("tag script HTML sem fechamento");
