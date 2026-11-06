@@ -293,7 +293,9 @@ async function callModel(
   timeoutMs = 40_000
 ): Promise<string> {
   const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${MODEL}`;
-  const upstream = await fetch(endpoint, {
+  let upstream: Response;
+  try {
+    upstream = await fetch(endpoint, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json", Accept: "text/event-stream" },
     body: JSON.stringify({
@@ -305,7 +307,14 @@ async function callModel(
     }),
     cache: "no-store",
     signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
-  });
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    if (error instanceof Error && (error.name === "TimeoutError" || /timeout|timed out|aborted/i.test(error.message))) {
+      throw new Error("A IA demorou mais que o limite desta etapa. Tente novamente no modo Completo ou envie uma correção menor.");
+    }
+    throw error;
+  }
 
   if (!upstream.ok) {
     const payload = await upstream.json().catch(() => null) as CloudflareError | null;
@@ -321,7 +330,15 @@ async function callModel(
     (error as Error & { status?: number }).status = upstream.status;
     throw error;
   }
-  return readCloudflareStream(upstream);
+  try {
+    return await readCloudflareStream(upstream);
+  } catch (error) {
+    if (signal.aborted) throw error;
+    if (error instanceof Error && (error.name === "TimeoutError" || /timeout|timed out|aborted/i.test(error.message))) {
+      throw new Error("A geração excedeu o tempo disponível. Tente novamente com um pedido menor ou no modo Completo.");
+    }
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {
