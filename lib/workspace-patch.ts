@@ -14,7 +14,7 @@ export type WorkspacePlan = {
 export const MAX_WORKSPACE_FILES = 80;
 export const MAX_WORKSPACE_FILE_CHARS = 120_000;
 export const MAX_WORKSPACE_TOTAL_CHARS = 160_000;
-export const MAX_PATCH_OPERATIONS = 4;
+export const MAX_PATCH_OPERATIONS = 12;
 
 const BLOCKED_SEGMENTS = new Set([".git", ".next", ".vercel", ".turbo", "node_modules", "coverage"]);
 
