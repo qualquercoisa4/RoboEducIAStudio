@@ -598,6 +598,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     let hudTimer = 0;
     let lastTime = 0;
     let animationFrame = 0;
+    let readyFrame = 0;
     let destroyed = false;
     let touchPointer: number | null = null;
     let lastTouchX = 0;
@@ -971,9 +972,10 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       animationFrame = window.requestAnimationFrame(animate);
     };
     animationFrame = window.requestAnimationFrame(animate);
-    setWorldReady(true);
+    readyFrame = window.requestAnimationFrame(() => setWorldReady(true));
 
     return () => {
+      window.cancelAnimationFrame(readyFrame);
       destroyed = true;
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("mousemove", onMouseMove);
