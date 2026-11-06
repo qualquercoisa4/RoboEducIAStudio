@@ -429,3 +429,69 @@ html:has(.studio-shell),body:has(.studio-shell){height:100%;overflow:hidden}
 .message.user .message-text,.message.user .markdown-message,.message.user .md-paragraph{color:#34303a!important}
 .message.assistant .message-text,.message.assistant .markdown-message{color:#403b48}
 .error-banner{font-size:13px;line-height:1.5}
+
+
+/* Interface inicial compacta — identidade visual RoboEduc */
+.model-settings{
+  width:100%;
+  margin:0 0 9px;
+  border:1px solid #e8e3eb;
+  border-radius:11px;
+  background:#fff;
+  overflow:hidden;
+}
+.model-settings summary{
+  min-height:38px;
+  padding:8px 12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  list-style:none;
+  cursor:pointer;
+  color:#5c5664;
+}
+.model-settings summary::-webkit-details-marker{display:none}
+.model-settings summary>span{
+  color:#918a96;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:1.4px;
+}
+.model-settings summary>strong{
+  min-width:0;
+  flex:1;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:700;
+}
+.model-settings summary>i{
+  color:#4598d1;
+  font-size:15px;
+  font-style:normal;
+  transition:transform .18s ease;
+}
+.model-settings[open] summary{border-bottom:1px solid #eeeaf0}
+.model-settings[open] summary>i{transform:rotate(180deg)}
+.model-settings .model-picker{
+  margin:0;
+  padding:10px 12px 12px;
+  grid-template-columns:1fr;
+  gap:6px;
+}
+.model-settings .model-picker select{width:100%;font-size:12px}
+.model-settings .model-picker label{font-size:8px}
+.composer-area>.model-settings+ .web-search-toggle{margin-top:0}
+.welcome>small{margin-bottom:4px}
+.welcome h1{margin-top:9px;margin-bottom:12px}
+.starter-grid{gap:10px;margin-top:22px}
+.starter-grid button{min-height:82px;padding:13px 15px}
+.starter-grid button>span{font-size:17px}
+.starter-grid button>b{font-size:13px}
+.starter-grid button>small{font-size:10px;line-height:1.35}
+@media(max-width:720px){
+  .model-settings summary{min-height:36px;padding:7px 10px}
+  .starter-grid{gap:8px;margin-top:17px}
+  .starter-grid button{min-height:76px;padding:10px 11px}
+}
