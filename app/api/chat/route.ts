@@ -86,6 +86,18 @@ function getTaskPlaybook(messages: ChatMessage[]) {
       "- Não use uma esfera como substituto do jogador se o pedido exige primeira pessoa.\n" +
       "- Inclua uma checklist curta de teste manual. Se não executou o jogo, declare que a validação foi estática."; 
   }
+  if (/\\b(arduino|esp32|servo|motor dc|motor de passo|sensor ultrass[oô]nico|protoboard|ponte h|driver de motor|rob[oô]tica|eletr[oô]nica)\\b/i.test(latest)) {
+    return "\\n\\nPLAYBOOK DE ENGENHARIA — ROBÓTICA / ELETRÔNICA:\\n" +
+      "- Antes de recomendar ligações, identifique a placa, tensão, corrente exigida e modelo do atuador/sensor. Se faltar dado essencial, declare a hipótese ou pergunte.\\n" +
+      "- Nunca recomende alimentar servos ou motores diretamente por pinos GPIO. Verifique a corrente disponível; use fonte externa adequada e driver quando necessário.\\n" +
+      "- Em fontes separadas, una os GNDs quando o circuito exigir referência comum de sinal; explique a ligação de forma explícita.\\n" +
+      "- Para motor DC, use driver/ponte H apropriado e proteções de retorno indutivo; não ligue o motor diretamente ao Arduino.\\n" +
+      "- Para servos, separe alimentação de potência do sinal de controle quando necessário e confira tensão, corrente de pico e faixa de pulsos.\\n" +
+      "- Declare a pinagem em uma tabela e mantenha a mesma pinagem no código e no esquema de ligação.\\n" +
+      "- Prefira millis() a delay() em projetos que precisam ler sensores e controlar vários atuadores simultaneamente.\\n" +
+      "- Inclua bibliotecas necessárias, modelo de placa e passos de teste. Não afirme que o circuito foi testado fisicamente."; 
+  }
+
   if (/\b(jogo|game|plataforma|personagem|colis[aã]o|moviment|controles mobile)\b/i.test(latest)) {
     return "\n\nPLAYBOOK DE ENGENHARIA — JOGO INTERATIVO:\n" +
       "- Modele estados explícitos quando aplicável.\n" +
