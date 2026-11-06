@@ -57,7 +57,7 @@ export default function WorkspacePage(){
    const snapshot=files.map(f=>({path:f.path,content:f.content}));
    const systemInstruction="Você é um agente de engenharia de software. Modifique o projeto existente de forma incremental. Preserve tudo que não precisa mudar. Não recrie o projeto inteiro. Retorne exclusivamente JSON válido neste formato: {\"summary\":\"resumo\",\"changes\":[{\"path\":\"arquivo.ext\",\"content\":\"conteúdo COMPLETO final\"}],\"deletes\":[]} . Inclua apenas arquivos novos ou alterados. deletes pode ser [] se não houver exclusões. Não retorne diffs, placeholders ou texto fora do JSON. Projeto: "+project.name;
    const messages=[...history.slice(-8).map(item=>({role:item.role==="assistant"?"assistant" as const:"user" as const,content:item.text})),{role:"user" as const,content:"PEDIDO ATUAL:\n"+request+"\n\nESTADO ATUAL DOS ARQUIVOS (fonte de verdade):\n"+JSON.stringify(snapshot)}];
-   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json",Accept:"text/event-stream"},body:JSON.stringify({messages,systemInstruction,mode,model,webSearch:false})});
+   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json",Accept:"text/event-stream"},body:JSON.stringify({messages,systemInstruction,mode,model,webSearch:false,structuredOutput:true})});
    if(!response.ok){const error=await response.json().catch(()=>null);throw new Error(error?.error||"Falha HTTP "+response.status)}
    if(!response.body)throw new Error("O servidor não retornou o fluxo.");
    const reader=response.body.getReader(),decoder=new TextDecoder();let buffer="",answer="";
