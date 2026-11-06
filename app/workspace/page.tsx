@@ -43,7 +43,7 @@ export default function WorkspacePage(){
  const [history,setHistory]=useState<{role:string;text:string}[]>([]);
  const files=project.files;
  const selected=files.find(file=>file.path===selectedPath)||files[0];
- const html=files.find(file=>file.path==="index.html")?.content||"";
+ const html=files.find(file=>file.path==="index.html")?.content||files.find(file=>file.path.toLowerCase().endsWith(".html"))?.content||"";
  const preview=useMemo(()=>makePreview(html,files),[html,files]);
  useEffect(()=>{try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const parsed=JSON.parse(raw);if(parsed&&Array.isArray(parsed.files)&&parsed.files.length)setProject(parsed)}}catch{localStorage.removeItem(STORAGE_KEY)}},[]);
  useEffect(()=>{localStorage.setItem(STORAGE_KEY,JSON.stringify(project))},[project]);
