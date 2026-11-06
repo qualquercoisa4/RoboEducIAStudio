@@ -765,7 +765,7 @@ async function executeWorkspaceEdit(args: {
     ];
 
     let streamed = "";
-    const content = await callWorkspaceModel(
+    let content = await callWorkspaceModel(
       accountId, apiToken, fileMessages, fileSystem, outputTokens, generationSignal, selectedModel, false,
       chunk => { streamed += chunk; send({ type: "file_chunk", path: operation.path, chunk }); },
       model => {
@@ -777,8 +777,47 @@ async function executeWorkspaceEdit(args: {
     if (streamed !== content) {
       throw new Error("O fluxo recebido para " + operation.path + " divergiu da resposta final. Nenhum arquivo foi aplicado.");
     }
-    const finalContent = unwrapGeneratedFile(content, operation.path);
-    validateGeneratedFile(operation.path, finalContent);
+
+    let finalContent = "";
+    try {
+      finalContent = unwrapGeneratedFile(content, operation.path);
+      validateGeneratedFile(operation.path, finalContent);
+    } catch (firstValidationError) {
+      const firstDetail = firstValidationError instanceof Error ? firstValidationError.message : "conteúdo inválido";
+      status("repairing-file", "A validação encontrou um problema em " + operation.path + ". Solicitando uma correção automática.");
+      send({ type: "file_reset", path: operation.path });
+      streamed = "";
+      const repairMessages: ChatMessage[] = [
+        ...fileMessages,
+        { role: "assistant", content },
+        { role: "user", content:
+          "O conteúdo anterior do arquivo foi rejeitado pelo validador: " + firstDetail + "\n" +
+          "Corrija somente esse arquivo, preserve os requisitos e a integração com os demais arquivos. " +
+          "Retorne o arquivo inteiro, completo e válido, sem Markdown, sem cercas e sem explicações. " +
+          "Não retorne o caminho do arquivo como conteúdo."
+        }
+      ];
+      try {
+        content = await callWorkspaceModel(
+          accountId, apiToken, repairMessages, fileSystem, outputTokens, generationSignal, selectedModel, false,
+          chunk => { streamed += chunk; send({ type: "file_chunk", path: operation.path, chunk }); },
+          model => {
+            streamed = "";
+            send({ type: "file_reset", path: operation.path });
+            status("fallback", "A correção de " + operation.path + " foi retomada por " + model + ".");
+          }
+        );
+        if (streamed !== content) {
+          throw new Error("O fluxo recebido durante a correção divergiu da resposta final.");
+        }
+        finalContent = unwrapGeneratedFile(content, operation.path);
+        validateGeneratedFile(operation.path, finalContent);
+        status("file-repaired", "A validação automática corrigiu " + operation.path + ".");
+      } catch (repairError) {
+        const repairDetail = repairError instanceof Error ? repairError.message : "falha na correção";
+        throw new Error("O arquivo " + operation.path + " não passou na validação inicial (" + firstDetail + ") nem na correção automática (" + repairDetail + "). Nenhuma alteração foi aplicada.");
+      }
+    }
     if (finalContent !== content) {
       // Only remove a complete outer code fence. Reset the client-side staging
       // buffer so the editor receives exactly the validated file content.
