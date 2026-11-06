@@ -69,7 +69,7 @@ function extractWorkspaceJson(raw: string): string {
   const fence = String.fromCharCode(96).repeat(3);
 
   if (value.startsWith(fence)) {
-    const firstLineEnd = value.indexOf("\\n");
+    const firstLineEnd = value.indexOf("\n");
     const closingFence = value.lastIndexOf(fence);
     if (
       firstLineEnd < 0 ||
