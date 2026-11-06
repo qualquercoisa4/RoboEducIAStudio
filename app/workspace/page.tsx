@@ -27,7 +27,7 @@ function makePreview(html:string,files:ProjectFile[]){
  let result=html;
  for(const file of files){
   if(file.path.endsWith(".css"))result=result.replace('<link rel="stylesheet" href="'+file.path+'">',"<style>\n"+file.content+"\n</style>");
-  if(file.path.endsWith(".js"))result=result.replace('<script src="'+file.path+'"></script>',"<script>\n"+file.content+"\n<\\/script>");
+  if(file.path.endsWith(".js"))result=result.replace('<script src="'+file.path+'"></script>',"<script>\n"+file.content+"\n</scr"+"ipt>");
  }
  return result;
 }
