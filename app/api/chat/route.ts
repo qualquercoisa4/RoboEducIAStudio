@@ -230,89 +230,74 @@ function stripBasicEntities(value: string) {
 
 function inspectCode(answer: string): string[] {
   const issues: string[] = [];
-  const fenceCount = (answer.match(/\`\`\`/g) ?? []).length;
-  if (fenceCount % 2 !== 0) issues.push("bloco de código aberto ou resposta possivelmente truncada");
-
-  const blocks = [...answer.matchAll(/\`\`\`([a-zA-Z0-9_+-]*)\s*\n([\s\S]*?)(?:\`\`\`|$)/g)];
-  for (const [, languageRaw, rawCode] of blocks) {
-    const language = languageRaw.toLowerCase();
-    const code = stripBasicEntities(rawCode);
-    const isHtml = ["html", "htm"].includes(language) || /<!doctype\s+html|<html\b/i.test(code);
-    const isCss = language === "css";
-    const isScript = ["javascript", "js", "typescript", "ts", "jsx", "tsx"].includes(language);
-
-    const incompletePatterns = [
-      { pattern: /\b(?:width|height|margin|padding|gap|font-size|border|color|background)\s*:\s*;/i, message: "declaração CSS sem valor" },
-      { pattern: /(?:const|let|var)\s+[\w$]+\s*=\s*;/, message: "variável declarada sem valor" },
-      { pattern: /Math\.(?:max|min)\(\s*,/, message: "argumento ausente em Math.max/Math.min" },
-      { pattern: /#[\s]*;/, message: "cor hexadecimal incompleta" },
-      { pattern: /\b(?:TODO|INSIRA AQUI|SEU_CODIGO|PLACEHOLDER)\b/i, message: "placeholder não substituído" },
-      { pattern: /(?:=|=>|\+|\.|,|\breturn)\s*$/, message: "linha de código possivelmente incompleta" }
-    ];
-    for (const item of incompletePatterns) {
-      if (item.pattern.test(code)) issues.push(item.message);
-    }
-
-    if (isCss) {
-      const cleanCss = code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ");
-      const opens = (cleanCss.match(/\{/g) ?? []).length;
-      const closes = (cleanCss.match(/\}/g) ?? []).length;
-      if (opens !== closes) issues.push("chaves CSS não balanceadas");
-    }
-
-    if (isHtml) {
-      const hasThreeCamera = /new\s+THREE\.PerspectiveCamera/i.test(code);
-      const hasPlayerMovement = /player\.position\.(?:x|y|z)\s*[+\-]?=/i.test(code) || /player\.position\.add/i.test(code);
-      const cameraTracksPlayer = /camera\.position\.(?:copy|set)\s*\(/i.test(code) || /player\.add\(\s*camera\s*\)/i.test(code) || /camera\.position\.y\s*=\s*player\.position\.y/i.test(code);
-      if (hasThreeCamera && hasPlayerMovement && !cameraTracksPlayer) {
-        issues.push("possível falha de câmera: o jogador se move, mas a câmera não parece acompanhar sua posição");
-      }
-      if (/new\s+THREE\.Raycaster/i.test(code) && /(?:place|colocar|build)/i.test(code) && !/(?:face\.normal|normal\.clone|intersect\.face)/i.test(code)) {
-        issues.push("colocação de blocos pode usar a posição do bloco atingido em vez da célula adjacente à face selecionada");
-      }
-      if (/touchstart|touchend/i.test(code) && /(?:moveSpeed|player\.position|keys\[)/i.test(code) && !/pointerdown|pointerup/i.test(code)) {
-        issues.push("controles por toque sem Pointer Events; podem falhar em mouse, cancelamento de toque ou multitouch");
-      }
-      const openScripts = (code.match(/<script\b/gi) ?? []).length;
-      const closeScripts = (code.match(/<\/script\s*>/gi) ?? []).length;
-      if (openScripts !== closeScripts) issues.push("tag script HTML sem fechamento");
-    }
-
-    if (isHtml) {
-      const robotBinding = /(?:const|let|var)\s+(\w+)\s*=\s*document\.getElementById\(\s*['"]robot['"]\s*\)/i.exec(code);
-      const rewriteMatch = /\w+\.innerHTML\s*=/i.exec(code);
-      const robotMarkupRecreated = /innerHTML\s*=\s*[\s\S]{0,500}?id\s*=\s*['"]robot['"]/i.test(code);
-      if (robotBinding && rewriteMatch && robotMarkupRecreated) {
-        const tail = code.slice(rewriteMatch.index + rewriteMatch[0].length);
-        const refreshed = new RegExp("\\b" + robotBinding[1] + "\\s*=\\s*document\\.(?:getElementById|querySelector)\\s*\\(", "i").test(tail);
-        if (!refreshed) {
-          issues.push("possível referência DOM obsoleta: o HTML recria o elemento #robot, mas a variável robot pode continuar apontando para o elemento antigo");
-        }
-      }
-    }
-
-    const scripts = isHtml
-      ? [...code.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)].map(match => match[1])
-      : isScript ? [code] : [];
-
-    for (const script of scripts) {
-      if (!script.trim()) continue;
-      const result = ts.transpileModule(script, {
-        reportDiagnostics: true,
-        compilerOptions: {
-          allowJs: true,
-          target: ts.ScriptTarget.ES2022,
-          jsx: ts.JsxEmit.ReactJSX,
-          reportDiagnostics: true
-        }
-      });
-      const syntaxErrors = (result.diagnostics ?? []).filter(diagnostic =>
-        diagnostic.category === ts.DiagnosticCategory.Error
-      );
-      if (syntaxErrors.length) issues.push("erro de sintaxe JavaScript/TypeScript detectado pelo compilador");
+  const sources: Array<{ path: string; code: string }> = [];
+  const cleaned = answer.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/, "");
+  let parsed: unknown;
+  try { parsed = JSON.parse(cleaned); }
+  catch {
+    const first = cleaned.indexOf("{"), last = cleaned.lastIndexOf("}");
+    if (first >= 0 && last > first) {
+      try { parsed = JSON.parse(cleaned.slice(first, last + 1)); } catch { /* resposta não estruturada */ }
     }
   }
-  return [...new Set(issues)];
+  if (parsed && typeof parsed === "object") {
+    const data = parsed as { changes?: unknown; files?: unknown; deletes?: unknown };
+    const entries = Array.isArray(data.changes) ? data.changes : Array.isArray(data.files) ? data.files : [];
+    const seen = new Set<string>();
+    for (const entry of entries) {
+      if (!entry || typeof entry !== "object") { issues.push("pacote contém um arquivo em formato inválido"); continue; }
+      const file = entry as { path?: unknown; content?: unknown };
+      if (typeof file.path !== "string" || typeof file.content !== "string") { issues.push("cada arquivo precisa ter path e content como texto"); continue; }
+      const path = file.path.trim().replace(/\\/g, "/");
+      if (!path || path.startsWith("/") || path.split("/").includes("..")) { issues.push("pacote contém caminho de arquivo inválido"); continue; }
+      if (seen.has(path)) issues.push("caminho duplicado no pacote: " + path);
+      seen.add(path);
+      if (!file.content.trim()) issues.push("arquivo retornado vazio: " + path);
+      sources.push({ path, code: file.content });
+    }
+    if (!entries.length && (!Array.isArray(data.deletes) || !data.deletes.length)) issues.push("resposta estruturada não contém arquivos para aplicar");
+  } else {
+    const fenceCount = (answer.match(/\x60{3}/g) ?? []).length;
+    if (fenceCount % 2 !== 0) issues.push("bloco de código aberto ou resposta possivelmente truncada");
+    const blocks = [...answer.matchAll(/\x60{3}([a-zA-Z0-9_+.-]*)\s*\n([\s\S]*?)(?:\x60{3}|$)/g)];
+    for (const [, language, code] of blocks) sources.push({ path: language || "code", code: stripBasicEntities(code) });
+  }
+  for (const source of sources) {
+    const path = source.path.toLowerCase(), code = stripBasicEntities(source.code);
+    const isHtml = path.endsWith(".html") || path.endsWith(".htm") || /<!doctype\s+html|<html\b/i.test(code);
+    const isCss = path.endsWith(".css") || path === "css";
+    const isScript = /\.(?:js|mjs|cjs|ts|tsx|jsx)$/i.test(path) || /^(?:javascript|js|typescript|ts|jsx|tsx)$/i.test(path);
+    const incomplete = [
+      { pattern: /\b(?:width|height|margin|padding|gap|font-size|border|color|background)\s*:\s*;/i, message: "declaração CSS sem valor em " + source.path },
+      { pattern: /(?:const|let|var)\s+[\w$]+\s*=\s*;/, message: "variável sem valor em " + source.path },
+      { pattern: /Math\.(?:max|min)\(\s*,/, message: "argumento ausente em Math.max/Math.min em " + source.path },
+      { pattern: /#[\s]*;/, message: "cor hexadecimal incompleta em " + source.path },
+      { pattern: /\b(?:TODO|INSIRA AQUI|SEU_CODIGO|PLACEHOLDER)\b/i, message: "placeholder não substituído em " + source.path },
+      { pattern: /(?:=|=>|\+|\.|,|\breturn)\s*$/, message: "arquivo termina com expressão possivelmente incompleta: " + source.path }
+    ];
+    for (const item of incomplete) if (item.pattern.test(code)) issues.push(item.message);
+    if (isCss) {
+      const clean = code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(["']).*?\1/g, "").replace(/\s+/g, " ");
+      if ((clean.match(/\{/g) ?? []).length !== (clean.match(/\}/g) ?? []).length) issues.push("chaves CSS não balanceadas em " + source.path);
+    }
+    if (isHtml) {
+      if ((code.match(/<script\b/gi) ?? []).length !== (code.match(/<\/script\s*>/gi) ?? []).length) issues.push("tag script sem fechamento em " + source.path);
+      if ((code.match(/<style\b/gi) ?? []).length !== (code.match(/<\/style\s*>/gi) ?? []).length) issues.push("tag style sem fechamento em " + source.path);
+      const hasCamera = /new\s+THREE\.PerspectiveCamera/i.test(code);
+      const hasMovement = /player\.position\.(?:x|y|z)\s*[+\-]?=/i.test(code) || /player\.position\.add/i.test(code);
+      const followsPlayer = /camera\.position\.(?:copy|set)\s*\(/i.test(code) || /player\.add\(\s*camera\s*\)/i.test(code) || /camera\.position\.y\s*=\s*player\.position\.y/i.test(code);
+      if (hasCamera && hasMovement && !followsPlayer) issues.push("possível câmera 3D que não acompanha o jogador");
+      if (/new\s+THREE\.Raycaster/i.test(code) && /(?:place|colocar|build)/i.test(code) && !/(?:face\.normal|normal\.clone|intersect\.face)/i.test(code)) issues.push("colocação de blocos pode ignorar a face atingida pelo raycast");
+      if (/touchstart|touchend/i.test(code) && /(?:moveSpeed|player\.position|keys\[)/i.test(code) && !/pointerdown|pointerup/i.test(code)) issues.push("controles de toque sem Pointer Events em " + source.path);
+    }
+    const scripts = isHtml ? [...code.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)].map(match => match[1]) : isScript ? [code] : [];
+    for (const script of scripts) {
+      if (!script.trim()) continue;
+      const result = ts.transpileModule(script, { reportDiagnostics: true, compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } });
+      if ((result.diagnostics ?? []).some(d => d.category === ts.DiagnosticCategory.Error)) issues.push("erro de sintaxe JavaScript/TypeScript em " + source.path);
+    }
+  }
+  return [...new Set(issues)].slice(0, 12);
 }
 
 function toEvents(execute: (send: (event: ProgressEvent | TokenEvent | ErrorEvent | { type: "done" } | { type: "reset" }) => void, signal: AbortSignal) => Promise<void>, requestSignal: AbortSignal) {
