@@ -11,9 +11,9 @@ type ProgressEvent = { type: "status"; stage: string; detail: string };
 type TokenEvent = { type: "token"; response: string };
 type ErrorEvent = { type: "error"; error: string };
 
-const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
+const MODEL = process.env.CLOUDFLARE_MODEL?.trim() || "@cf/qwen/qwen3-30b-a3b-fp8";
 const MAX_MESSAGES = 14;
-const MAX_MESSAGE_LENGTH = 24_000;
+const MAX_MESSAGE_LENGTH = 40_000;
 const MAX_CONTEXT_CHARS = 56_000;
 const MAX_OUTPUT_TOKENS = 6_144;
 const MAX_DEEP_OUTPUT_TOKENS = 8_192;
