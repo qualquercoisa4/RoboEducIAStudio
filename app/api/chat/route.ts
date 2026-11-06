@@ -349,7 +349,8 @@ async function callModel(
   timeoutMs = 40_000,
   selectedModel = "cloudflare",
   useWebSearch = false,
-  onToken?: (chunk: string) => void
+  onToken?: (chunk: string) => void,
+  structuredOutput = false
 ): Promise<string> {
   const useOpenAI = selectedModel === "openai:gpt-5.6-luna";
   const useGemini = selectedModel.startsWith("gemini:");
@@ -374,7 +375,7 @@ async function callModel(
     ? {
         systemInstruction: { parts: [{ text: systemInstruction }] },
         contents: messages.map(message => ({ role: message.role === "assistant" ? "model" : "user", parts: [{ text: message.content }] })),
-        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.2, topP: 0.85 }
+        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.1, topP: 0.85, ...(structuredOutput ? { responseMimeType: "application/json" } : {}) }
       }
     : {
         messages: [{ role: "system", content: systemInstruction }, ...messages],
@@ -385,6 +386,7 @@ async function callModel(
             : { max_tokens: maxTokens }),
         ...(!useOpenAI ? { temperature: 0.2, top_p: 0.85 } : {}),
         ...(useOpenRouter && useWebSearch ? { tools: [{ type: "openrouter:web_search" }] } : {}),
+        ...(useOpenRouter && structuredOutput ? { response_format: { type: "json_object" } } : {}),
         stream: true
       };
   let upstream: Response;
@@ -496,7 +498,7 @@ export async function POST(request: Request) {
       let activeModel = selectedModel;
       let answer = "";
       try {
-        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, Boolean(body.webSearch), chunk => send({ type: "token", response: chunk }));
+        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, Boolean(body.webSearch), chunk => send({ type: "token", response: chunk }), body.structuredOutput === true);
       } catch (primaryError) {
         if (signal.aborted) throw primaryError;
         const message = primaryError instanceof Error ? primaryError.message : String(primaryError);
@@ -522,7 +524,7 @@ export async function POST(request: Request) {
           try {
             activeModel = fallbackModel;
             answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal,
-              fallbackModel === "cloudflare" ? 30_000 : 30_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }));
+              fallbackModel === "cloudflare" ? 30_000 : 30_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }), body.structuredOutput === true && fallbackModel !== "cloudflare");
             if (answer.trim()) {
               status("fallback-success", "Resposta recuperada automaticamente por " + fallbackName + ".");
               break;
