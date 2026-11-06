@@ -2,26 +2,43 @@ import { NextResponse } from "next/server";
 import ts from "typescript";
 
 export const runtime = "nodejs";
-export const maxDuration = 60; // Mantido dentro do limite de execução do projeto.
+export const maxDuration = 60;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type WorkMode = "fast" | "complete" | "deep";
 type CloudflareError = { errors?: Array<{ message?: string }>; messages?: Array<{ message?: string }> };
+type ProgressEvent = { type: "status"; stage: string; detail: string };
+type TokenEvent = { type: "token"; response: string };
+type ErrorEvent = { type: "error"; error: string };
+
 const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
-const MAX_MESSAGES = 16;
-const MAX_MESSAGE_LENGTH = 12000;
-const MAX_OUTPUT_TOKENS = 4096; // Permite respostas longas, como jogos completos em um arquivo.
-const MAX_REPAIR_TOKENS = 3072;
+const MAX_MESSAGES = 14;
+const MAX_MESSAGE_LENGTH = 24_000;
+const MAX_CONTEXT_CHARS = 56_000;
+const MAX_OUTPUT_TOKENS = 6_144;
+const MAX_DEEP_OUTPUT_TOKENS = 8_192;
+const MAX_REPAIR_TOKENS = 2_048;
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 const QUALITY_RULES = `
-REGRAS OBRIGATÓRIAS DE QUALIDADE:
-- Entregue código completo, executável e coerente com o pedido. Nunca deixe valores, argumentos, nomes ou trechos em branco.
-- Não use placeholders como "TODO", "...", "INSIRA AQUI", "SEU_CODIGO" ou propriedades sem valor em código que deveria estar pronto.
-- Antes de responder, revise mentalmente a sintaxe, variáveis, imports, fechamento de tags/chaves/parênteses, dependências e instruções de execução.
-- Para HTML/CSS/JavaScript, confira especialmente se todas as declarações CSS têm valores válidos e se expressões JavaScript não têm argumentos ou atribuições vazias.
-- Se o pedido exigir um arquivo único, coloque HTML, CSS e JavaScript no mesmo arquivo e inclua tudo que for necessário.
-- Não afirme que executou ou testou o código se isso não aconteceu. Se não puder executar, diga que fez uma revisão estática.
-- Prefira uma solução menor e funcional a uma solução ambiciosa, incompleta ou com dependências desnecessárias.
+PADRÃO DE QUALIDADE ROBOEDUC:
+- Responda em português brasileiro, com precisão, clareza e foco educacional.
+- Atenda todos os requisitos explícitos do pedido. Não substitua o projeto pedido por um exemplo genérico ou por outro gênero de jogo.
+- Quando houver contexto anterior relevante, preserve as decisões e restrições já estabelecidas.
+- Não invente bibliotecas, APIs, resultados de testes, arquivos ou funcionalidades.
+- Diferencie fatos confirmados, hipóteses e limitações.
+- Em tarefas técnicas, explique decisões importantes e dê instruções que o aluno consiga seguir.
+- Em código, entregue uma solução completa, consistente e executável. Não deixe variáveis, argumentos, declarações CSS ou funções pela metade.
+- Nunca use placeholders como TODO, "...", "INSIRA AQUI", "SEU_CODIGO" ou "restante do código".
+- Não omita partes com frases como "o restante permanece igual". Se o pedido for por um arquivo completo, entregue o arquivo completo.
+- Em HTML/CSS/JavaScript, prefira um único HTML autocontido quando isso atender ao pedido. Feche tags, chaves, parênteses e aspas.
+- Não transforme caracteres da linguagem em entidades HTML (&lt;, &gt;, &amp;) dentro de blocos de código.
+- Antes de finalizar código, confira coerência entre IDs, seletores, nomes de funções, variáveis, eventos, referências e ordem de inicialização.
+- Considere telas pequenas e controles por toque quando o projeto for destinado a celular.
+- Se o pedido estiver ambíguo, faça uma pergunta objetiva; não invente requisitos essenciais.
+- Nunca diga que executou o código ou que ele está livre de bugs sem ter ocorrido uma execução real. Informe quando a validação foi apenas estática.
+- Prefira uma implementação menor e funcional a uma solução ambiciosa e incompleta.
+- Não exponha raciocínio interno privado. Forneça apenas uma explicação resumida das decisões e verificações relevantes.
 `;
 
 function getClientIp(request: Request) {
@@ -39,6 +56,22 @@ function rateLimited(ip: string) {
   if (current.count >= 20) return true;
   current.count += 1;
   return false;
+}
+
+function trimContext(messages: ChatMessage[]) {
+  const recent = messages.slice(-MAX_MESSAGES);
+  let remaining = MAX_CONTEXT_CHARS;
+  const selected: ChatMessage[] = [];
+
+  for (let index = recent.length - 1; index >= 0 && remaining > 0; index -= 1) {
+    const message = recent[index];
+    const content = message.content.length > remaining
+      ? message.content.slice(-remaining)
+      : message.content;
+    selected.unshift({ role: message.role, content });
+    remaining -= content.length;
+  }
+  return selected;
 }
 
 function extractResponse(payload: unknown): string {
@@ -97,68 +130,126 @@ async function readCloudflareStream(response: Response): Promise<string> {
   return answer.trim();
 }
 
-function inspectCode(answer: string): string[] {
-  const blocks = [...answer.matchAll(/```([a-zA-Z0-9_+-]*)\s*\n([\s\S]*?)```/g)];
-  const issues: string[] = [];
-  if (!blocks.length) return issues;
+function isLikelyCodeTask(messages: ChatMessage[], answer = "") {
+  const latestUser = [...messages].reverse().find(message => message.role === "user")?.content ?? "";
+  return /\`\`\`(?:html?|css|javascript|js|typescript|ts|python|py|java|cpp|c\+\+|csharp|cs|jsx|tsx)|<!doctype\s+html|<html\b/i.test(answer) ||
+    /\b(c[oó]digo|programa[cç][aã]o|programar|html|css|javascript|typescript|python|arduino|jogo|site|aplicativo|debug|depurar|bug|erro de sintaxe|script)\b/i.test(latestUser);
+}
 
-  for (const [, languageRaw, code] of blocks) {
+function stripBasicEntities(value: string) {
+  return value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+}
+
+function inspectCode(answer: string): string[] {
+  const issues: string[] = [];
+  const fenceCount = (answer.match(/\`\`\`/g) ?? []).length;
+  if (fenceCount % 2 !== 0) issues.push("bloco de código aberto ou resposta possivelmente truncada");
+
+  const blocks = [...answer.matchAll(/\`\`\`([a-zA-Z0-9_+-]*)\s*\n([\s\S]*?)(?:\`\`\`|$)/g)];
+  for (const [, languageRaw, rawCode] of blocks) {
     const language = languageRaw.toLowerCase();
-    const isWebCode = ["html", "htm", "css", "javascript", "js", "typescript", "ts", "jsx", "tsx"].includes(language);
+    const code = stripBasicEntities(rawCode);
+    const isHtml = ["html", "htm"].includes(language) || /<!doctype\s+html|<html\b/i.test(code);
+    const isCss = language === "css";
+    const isScript = ["javascript", "js", "typescript", "ts", "jsx", "tsx"].includes(language);
 
     const incompletePatterns = [
-      { pattern: /\b(?:width|height|margin|padding|gap|font-size|border)\s*:\s*;/i, message: "declaração CSS sem valor" },
-      { pattern: /\b(?:width|height|margin|padding|gap|font-size)\s*:\s*(?:px|rem|em|%)\s*;/i, message: "valor CSS incompleto" },
+      { pattern: /\b(?:width|height|margin|padding|gap|font-size|border|color|background)\s*:\s*;/i, message: "declaração CSS sem valor" },
       { pattern: /(?:const|let|var)\s+[\w$]+\s*=\s*;/, message: "variável declarada sem valor" },
       { pattern: /Math\.(?:max|min)\(\s*,/, message: "argumento ausente em Math.max/Math.min" },
       { pattern: /#[\s]*;/, message: "cor hexadecimal incompleta" },
-      { pattern: /\b(?:TODO|INSIRA AQUI|SEU_CODIGO|PLACEHOLDER)\b/i, message: "placeholder não substituído" }
+      { pattern: /\b(?:TODO|INSIRA AQUI|SEU_CODIGO|PLACEHOLDER)\b/i, message: "placeholder não substituído" },
+      { pattern: /(?:=|=>|\+|\.|,|\breturn)\s*$/, message: "linha de código possivelmente incompleta" }
     ];
     for (const item of incompletePatterns) {
       if (item.pattern.test(code)) issues.push(item.message);
     }
 
-    if (isWebCode) {
-      const scripts = language === "html"
-        ? [...code.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)].map(match => match[1])
-        : [code];
-      for (const script of scripts) {
-        if (!script.trim()) continue;
-        const result = ts.transpileModule(script, {
-          reportDiagnostics: true,
-          compilerOptions: {
-            allowJs: true,
-            target: ts.ScriptTarget.ES2020,
-            jsx: ts.JsxEmit.ReactJSX,
-            reportDiagnostics: true
-          }
-        });
-        const syntaxErrors = (result.diagnostics ?? []).filter(diagnostic =>
-          diagnostic.category === ts.DiagnosticCategory.Error &&
-          [1002, 1003, 1005, 1109, 1128, 1136, 1161, 1381, 1382].includes(diagnostic.code)
-        );
-        if (syntaxErrors.length) issues.push("erro de sintaxe JavaScript/TypeScript");
-      }
+    if (isCss) {
+      const cleanCss = code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ");
+      const opens = (cleanCss.match(/\{/g) ?? []).length;
+      const closes = (cleanCss.match(/\}/g) ?? []).length;
+      if (opens !== closes) issues.push("chaves CSS não balanceadas");
+    }
+
+    if (isHtml) {
+      const openScripts = (code.match(/<script\b/gi) ?? []).length;
+      const closeScripts = (code.match(/<\/script\s*>/gi) ?? []).length;
+      if (openScripts !== closeScripts) issues.push("tag script HTML sem fechamento");
+    }
+
+    const scripts = isHtml
+      ? [...code.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)].map(match => match[1])
+      : isScript ? [code] : [];
+
+    for (const script of scripts) {
+      if (!script.trim()) continue;
+      const result = ts.transpileModule(script, {
+        reportDiagnostics: true,
+        compilerOptions: {
+          allowJs: true,
+          target: ts.ScriptTarget.ES2022,
+          jsx: ts.JsxEmit.ReactJSX,
+          reportDiagnostics: true
+        }
+      });
+      const syntaxErrors = (result.diagnostics ?? []).filter(diagnostic =>
+        diagnostic.category === ts.DiagnosticCategory.Error
+      );
+      if (syntaxErrors.length) issues.push("erro de sintaxe JavaScript/TypeScript detectado pelo compilador");
     }
   }
   return [...new Set(issues)];
 }
 
-function toEventStream(text: string) {
+function toEvents(execute: (send: (event: ProgressEvent | TokenEvent | ErrorEvent | { type: "done" }) => void, signal: AbortSignal) => Promise<void>, requestSignal: AbortSignal) {
   const encoder = new TextEncoder();
-  const chunks = text.match(/[\s\S]{1,72}/g) ?? [text];
-  return new ReadableStream<Uint8Array>({
+  const aborter = new AbortController();
+  const signal = AbortSignal.any([requestSignal, aborter.signal]);
+  const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      for (const chunk of chunks) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ response: chunk })}\n\n`));
-      }
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      controller.close();
+      const send = (event: ProgressEvent | TokenEvent | ErrorEvent | { type: "done" }) => {
+        try {
+          controller.enqueue(encoder.encode("data: " + JSON.stringify(event) + "\n\n"));
+        } catch {
+          aborter.abort();
+        }
+      };
+      void execute(send, signal)
+        .catch(error => {
+          if (!signal.aborted) {
+            send({ type: "error", error: error instanceof Error ? error.message : "Não foi possível concluir a solicitação." });
+          }
+        })
+        .finally(() => {
+          try { controller.close(); } catch {}
+        });
+    },
+    cancel() {
+      aborter.abort();
+    }
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no"
     }
   });
 }
 
-async function callModel(accountId: string, apiToken: string, messages: ChatMessage[], systemInstruction: string, maxTokens: number, timeoutMs = 42_000): Promise<string> {
+async function callModel(
+  accountId: string,
+  apiToken: string,
+  messages: ChatMessage[],
+  systemInstruction: string,
+  maxTokens: number,
+  signal: AbortSignal,
+  timeoutMs = 40_000
+): Promise<string> {
   const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${MODEL}`;
   const upstream = await fetch(endpoint, {
     method: "POST",
@@ -166,11 +257,12 @@ async function callModel(accountId: string, apiToken: string, messages: ChatMess
     body: JSON.stringify({
       messages: [{ role: "system", content: systemInstruction }, ...messages],
       max_tokens: maxTokens,
-      temperature: 0.25,
+      temperature: 0.2,
+      top_p: 0.85,
       stream: true
     }),
     cache: "no-store",
-    signal: AbortSignal.timeout(timeoutMs)
+    signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
   });
 
   if (!upstream.ok) {
@@ -202,13 +294,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json() as { messages?: ChatMessage[]; systemInstruction?: string };
+    const body = await request.json() as { messages?: ChatMessage[]; systemInstruction?: string; mode?: WorkMode };
     if (!Array.isArray(body.messages) || body.messages.length === 0) {
       return NextResponse.json({ error: "Envie ao menos uma mensagem." }, { status: 400 });
     }
 
-    const messages = body.messages.slice(-MAX_MESSAGES);
-    const valid = messages.every(message =>
+    const valid = body.messages.every(message =>
       message && (message.role === "user" || message.role === "assistant") &&
       typeof message.content === "string" && message.content.trim().length > 0 &&
       message.content.length <= MAX_MESSAGE_LENGTH
@@ -217,55 +308,79 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A conversa contém mensagens inválidas ou muito longas." }, { status: 400 });
     }
 
+    const messages = trimContext(body.messages);
     const requestedInstruction = typeof body.systemInstruction === "string" && body.systemInstruction.trim()
-      ? body.systemInstruction.trim().slice(0, 5000)
+      ? body.systemInstruction.trim().slice(0, 5_000)
       : "Você é o RoboEduc AI, assistente educacional especializado em tecnologia, robótica, eletrônica, programação e ciências. Responda em português brasileiro, com precisão e exemplos práticos.";
-    const systemInstruction = `${requestedInstruction}\n\n${QUALITY_RULES}`;
+    const systemInstruction = requestedInstruction + "\n\n" + QUALITY_RULES;
+    const mode: WorkMode = body.mode === "fast" || body.mode === "deep" ? body.mode : "complete";
+    const codeTask = isLikelyCodeTask(messages);
+    const maxTokens = mode === "fast"
+      ? (codeTask ? 4_096 : 3_072)
+      : mode === "deep" ? MAX_DEEP_OUTPUT_TOKENS
+        : codeTask ? MAX_OUTPUT_TOKENS : 4_096;
+    const repairTokens = mode === "deep" ? MAX_REPAIR_TOKENS : 1_536;
 
-    let answer = await callModel(accountId, apiToken, messages, systemInstruction, MAX_OUTPUT_TOKENS);
-    if (!answer) {
-      return NextResponse.json({ error: "O modelo encerrou a geração sem retornar texto. Tente novamente." }, { status: 502 });
-    }
+    return toEvents(async (send, signal) => {
+      const status = (stage: string, detail: string) => send({ type: "status", stage, detail });
+      status("context", "Preparando o contexto e os requisitos da solicitação.");
+      status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
 
-    const issues = inspectCode(answer);
-    if (issues.length) {
-      console.warn("RoboEduc AI code validation requested repair:", issues);
-      const repairMessages: ChatMessage[] = [
-        ...messages,
-        { role: "assistant", content: answer },
-        {
-          role: "user",
-          content: `REVISE E CORRIJA a resposta anterior antes de entregá-la. A revisão automática encontrou: ${issues.join(", ")}. Reescreva a resposta completa, preservando o objetivo original. Corrija todos os erros, preencha todos os valores e argumentos, e entregue o código completo. Não explique a auditoria; apresente a versão corrigida.`
-        }
-      ];
-      const repaired = await callModel(accountId, apiToken, repairMessages, systemInstruction, MAX_REPAIR_TOKENS, 15_000);
-      if (repaired.trim()) {
-        const remainingIssues = inspectCode(repaired);
-        if (remainingIssues.length) {
-          console.warn("RoboEduc AI repair still has static warnings:", remainingIssues);
-          answer = repaired + "\n\n> Observação: fiz uma revisão estática, mas não consegui confirmar a execução deste código. Revise antes de usar em um projeto real.";
+      let answer = await callModel(accountId, apiToken, messages, systemInstruction, maxTokens, signal, 40_000);
+      if (!answer.trim()) throw new Error("O modelo encerrou a geração sem retornar texto. Tente novamente.");
+
+      if (isLikelyCodeTask(messages, answer)) {
+        status("review", "Verificando integridade dos blocos, sintaxe e sinais de código incompleto.");
+        const issues = inspectCode(answer);
+        if (issues.length) {
+          status("repair", "A revisão encontrou possíveis falhas. Solicitando uma correção antes da entrega.");
+          const repairMessages: ChatMessage[] = [
+            ...messages,
+            { role: "assistant", content: answer },
+            {
+              role: "user",
+              content: "Faça uma revisão técnica e corrija a resposta anterior. A verificação automática apontou: " +
+                issues.join("; ") +
+                ". Reescreva a resposta completa, preserve o pedido e as decisões anteriores, feche todos os blocos e não use placeholders. Não afirme que executou o código. Entregue a versão completa corrigida."
+            }
+          ];
+          try {
+            const repaired = await callModel(accountId, apiToken, repairMessages, systemInstruction, repairTokens, signal, 15_000);
+            if (repaired.trim()) {
+              const remainingIssues = inspectCode(repaired);
+              if (remainingIssues.length) {
+                status("warning", "A correção foi aplicada, mas ainda há alertas estáticos que precisam ser conferidos.");
+                answer = repaired + "\n\n> A revisão automática ainda identificou pontos que precisam de conferência: " + remainingIssues.join(", ") + ". A execução real deve ser testada no navegador.";
+              } else {
+                status("reviewed", "A revisão estática foi concluída após a correção.");
+                answer = repaired;
+              }
+            }
+          } catch (repairError) {
+            if (signal.aborted) throw repairError;
+            status("warning", "A geração foi preservada, mas a etapa de correção automática não terminou a tempo.");
+            answer += "\n\n> A revisão automática não conseguiu concluir a correção dentro do tempo disponível. Teste o código no executor e envie eventuais erros para a IA.";
+          }
         } else {
-          answer = repaired;
+          status("reviewed", "Nenhum problema sintático conhecido foi detectado na revisão estática.");
         }
+      } else {
+        status("reviewed", "Resposta conferida quanto à presença de conteúdo e consistência básica.");
       }
-    }
 
-    return new Response(toEventStream(answer), {
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
-        "Connection": "keep-alive",
-        "X-Accel-Buffering": "no"
+      status("delivery", "Preparando a resposta final.");
+      const chunks = answer.match(/[\s\S]{1,96}/g) ?? [answer];
+      for (const chunk of chunks) {
+        if (signal.aborted) return;
+        send({ type: "token", response: chunk });
       }
-    });
+      send({ type: "done" });
+    }, request.signal);
   } catch (error) {
-    console.error("Chat API error:", error);
+    console.error("Chat API validation error:", error);
     const status = (error as Error & { status?: number }).status;
-    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
     return NextResponse.json({
-      error: timedOut ? "A geração ou revisão demorou demais. Tente novamente com uma pergunta menor." :
-        error instanceof Error ? error.message : "Não foi possível concluir a solicitação."
-    }, { status: status === 429 ? 429 : timedOut ? 504 : 500 });
+      error: error instanceof Error ? error.message : "Não foi possível concluir a solicitação."
+    }, { status: status === 429 ? 429 : 400 });
   }
 }
