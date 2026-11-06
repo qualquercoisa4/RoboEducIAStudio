@@ -1,19 +1,21 @@
 # RoboEduc IA Studio
 
-MVP educacional construído com Next.js e WebLLM.
+Aplicação educacional com duas áreas: chatbot RoboEduc IA na página inicial e Game Studio em `/studio`.
 
-## Inferência local
+## Chatbot
 
-O navegador executa o modelo `Qwen2-0.5B-Instruct-q4f16_1-MLC` com WebGPU. Não exige API key, conta externa ou variável secreta. As mensagens são processadas localmente.
+O chatbot usa Cloudflare Workers AI com o modelo `@cf/qwen/qwen3-30b-a3b-fp8`, com transmissão incremental (Server-Sent Events). A chave fica no servidor e não é enviada ao navegador.
 
-## Primeiro uso
+Configure estas variáveis no ambiente de execução (por exemplo, Vercel):
 
-1. Abra o site em navegador e dispositivo compatíveis com WebGPU.
-2. Clique em **Carregar IA neste dispositivo**.
-3. Aguarde o download inicial do modelo.
-4. Envie uma mensagem.
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN` (token com permissão para executar Workers AI)
 
-O download é feito uma vez e o navegador pode armazenar o modelo em cache. O modelo é pequeno e sua qualidade é inferior à de modelos de nuvem maiores. A compatibilidade e o desempenho dependem da GPU, memória e navegador. Alguns celulares não oferecem WebGPU.
+Sem essas credenciais, a interface abre, mas o envio de mensagens retorna um aviso de configuração.
+
+## Game Studio
+
+Acesse `/studio` para usar o criador de jogos existente. O código e o componente de sobrevivência foram preservados.
 
 ## Desenvolvimento
 
@@ -22,10 +24,8 @@ npm install
 npm run dev
 ```
 
-## Privacidade e limitações
+## Privacidade e limites
 
-- A geração ocorre no próprio navegador; os prompts não são enviados a uma API de IA.
-- O primeiro carregamento baixa pesos do modelo de infraestrutura pública MLC/Hugging Face.
-- O histórico fica no armazenamento local do navegador.
-- É necessário suporte a WebGPU.
-- As rotas antigas em `app/api` são legadas e não são usadas pela interface local.
+- O histórico do chatbot é salvo no armazenamento local do navegador.
+- As mensagens enviadas ao chatbot são processadas pela Cloudflare Workers AI.
+- Há um limite básico por instância de 20 requisições por minuto por IP. Para produção com tráfego público, recomenda-se adicionar rate limiting compartilhado e autenticação.
