@@ -2,6 +2,7 @@
 
 import "./workspace.css";
 import Link from "next/link";
+import { buildWorkspacePreview } from "@/lib/workspace-preview";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 type ProjectFile = { path: string; content: string; updatedAt: number };
@@ -15,14 +16,6 @@ const starterFiles: ProjectFile[] = [
  {path:"src/style.css",content:"body{margin:0;min-height:100vh;font-family:system-ui,sans-serif;background:#f4f7fb;color:#343044}main{max-width:900px;margin:auto;padding:32px}h1{color:#4598d1}",updatedAt:Date.now()},
  {path:"src/main.js",content:"const app=document.querySelector('#app');\nconsole.log('Projeto iniciado',app);",updatedAt:Date.now()}
 ];
-function makePreview(html:string,files:ProjectFile[]){
- let result=html;
- for(const file of files){
-  if(file.path.endsWith(".css"))result=result.replace('<link rel="stylesheet" href="'+file.path+'">',"<style>\n"+file.content+"\n</style>");
-  if(file.path.endsWith(".js"))result=result.replace('<script src="'+file.path+'"></script>',"<script>\n"+file.content+"\n</scr"+"ipt>");
- }
- return result;
-}
 const INITIAL_PROJECT: Project = { name: "Meu projeto", files: starterFiles };
 let workspaceCacheRaw: string | null | undefined;
 let workspaceCache: Project = INITIAL_PROJECT;
@@ -66,6 +59,11 @@ function subscribeToWorkspace(callback: () => void) {
 
 export default function WorkspacePage(){
  const project = useSyncExternalStore(subscribeToWorkspace, getWorkspaceSnapshot, getServerWorkspaceSnapshot);
+ const projectRef=useRef(project);
+ const previewFrameRef=useRef<HTMLIFrameElement|null>(null);
+ const [previewErrors,setPreviewErrors]=useState<string[]>([]);
+ const [previewReady,setPreviewReady]=useState(false);
+ const [previewReload,setPreviewReload]=useState(0);
  const setProject = (update: Project | ((current: Project) => Project)) => {
   const current = getWorkspaceSnapshot();
   const next = typeof update === "function" ? update(current) : update;
@@ -74,13 +72,27 @@ export default function WorkspacePage(){
    localStorage.setItem(STORAGE_KEY, serialized);
    workspaceCacheRaw = serialized;
    workspaceCache = next;
+   projectRef.current=next;
    window.dispatchEvent(new Event("roboeduc-workspace-change"));
   } catch (error) {
    console.error("Não foi possível salvar o projeto localmente.", error);
   }
  };
- const projectRef=useRef(project);
  useEffect(()=>{projectRef.current=project},[project]);
+ useEffect(()=>{setPreviewErrors([]);setPreviewReady(false)},[project.files]);
+ useEffect(()=>{
+  const onPreviewMessage=(event:MessageEvent)=>{
+   if(event.source!==previewFrameRef.current?.contentWindow)return;
+   const data=event.data as {__roboeducWorkspacePreview?:boolean;type?:string;message?:string};
+   if(!data?.__roboeducWorkspacePreview)return;
+   if(data.type==="ready"){setPreviewReady(true);return}
+   if(data.type==="error"&&typeof data.message==="string"){
+    setPreviewErrors(previous=>previous.includes(data.message!.slice(0,1600))?previous:[...previous,data.message!.slice(0,1600)].slice(-12));
+   }
+  };
+  window.addEventListener("message",onPreviewMessage);
+  return()=>window.removeEventListener("message",onPreviewMessage);
+ },[]);
  const [selectedPath,setSelectedPath]=useState("index.html");
  const [prompt,setPrompt]=useState("");
  const [busy,setBusy]=useState(false);
@@ -92,14 +104,14 @@ export default function WorkspacePage(){
  const files=project.files;
  const selected=files.find(file=>file.path===selectedPath)||files[0];
  const html=files.find(file=>file.path==="index.html")?.content||files.find(file=>file.path.toLowerCase().endsWith(".html"))?.content||"";
- const preview=useMemo(()=>makePreview(html,files),[html,files]);
+ const preview=useMemo(()=>buildWorkspacePreview(html,files),[html,files]);
 
  function updateSelected(value:string){if(!selected)return;setProject(old=>({...old,files:old.files.map(f=>f.path===selected.path?{...f,content:value,updatedAt:Date.now()}:f)}))}
  function addFile(){const raw=window.prompt("Caminho do novo arquivo (ex.: src/player.js)");if(!raw)return;const path=raw.trim().replace(/^\/+/, "").replace(/\\/g,"/");if(!path||path.split("/").includes("..")||files.some(f=>f.path===path)){setStatus("Caminho inválido ou arquivo já existente.");return}setProject(old=>({...old,files:[...old.files,{path,content:"",updatedAt:Date.now()}]}));setSelectedPath(path);setTab("code")}
  function removeFile(){if(!selected||!window.confirm("Excluir "+selected.path+"?"))return;const next=files.filter(f=>f.path!==selected.path);setProject(old=>({...old,files:next}));setSelectedPath(next[0]?.path||"")}
  function exportFiles(){const text=files.map(f=>"===== "+f.path+" =====\n"+f.content).join("\n\n");const url=URL.createObjectURL(new Blob([text],{type:"text/plain"}));const a=document.createElement("a");a.href=url;a.download="projeto-roboeduc.txt";a.click();URL.revokeObjectURL(url)}
- async function askAI(){
-  const request=prompt.trim();
+ async function askAI(overridePrompt?:string){
+  const request=(overridePrompt??prompt).trim();
   if(!request||busy)return;
   const snapshot=project.files.map(file=>({path:file.path,content:file.content}));
   setBusy(true);
@@ -233,6 +245,9 @@ export default function WorkspacePage(){
    const nextProject={...current,files:[...nextMap.values()].sort((a,b)=>a.path.localeCompare(b.path))};
    setProject(nextProject);
    projectRef.current=nextProject;
+   setPreviewErrors([]);
+   setPreviewReady(false);
+   setPreviewReload(value=>value+1);
    const firstChanged=completedApplySignal.operations.find(operation=>operation.action!=="delete");
    if(firstChanged){setSelectedPath(firstChanged.path);setTab("preview")}
    else if(completedApplySignal.operations.length){setSelectedPath(nextProject.files[0]?.path||"");setTab("code")}
@@ -250,7 +265,7 @@ export default function WorkspacePage(){
   <nav className="studio-main-tabs"><button className={tab==="chat"?"selected":""} onClick={()=>setTab("chat")}>✦ Chat</button><button className={tab==="code"?"selected":""} onClick={()=>setTab("code")}>‹/› Código <small>{files.length}</small></button><button className={tab==="preview"?"selected":""} onClick={()=>setTab("preview")}>◉ Prévia</button></nav>
   {tab==="chat"&&<section className="studio-chat-view"><div className="studio-chat-history">{history.length===0&&<div className="studio-chat-intro"><div>✦</div><h1>O que vamos construir?</h1><p>Descreva o que deseja. A IA vai analisar e editar os arquivos do projeto.</p></div>}{history.map((item,i)=><article key={i} className={"studio-message "+item.role}><b>{item.role==="user"?"Você":"RoboEduc AI"}</b><p>{item.text}</p></article>)}{busy&&<article className="studio-message assistant"><b>RoboEduc AI</b><p className="studio-thinking">{status}</p></article>}</div><div className="studio-chat-composer"><textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void askAI()}}} placeholder="Descreva o que deseja criar ou modificar..." disabled={busy}/><div className="studio-controls"><select value={model} onChange={e=>setModel(e.target.value)} disabled={busy}><option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next</option><option value="openrouter:qwen/qwen-2.5-coder-32b-instruct">Qwen2.5 Coder 32B (teste)</option><option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash</option><option value="cloudflare">Cloudflare Workers AI</option><option value="google/gemma-4-31b-it:free">Gemma 4 31B</option><option value="cohere/north-mini-code:free">North Mini Code</option></select><select value={mode} onChange={e=>setMode(e.target.value)} disabled={busy}><option value="complete">Completo</option><option value="deep">Profundo</option><option value="fast">Rápido</option></select><button onClick={()=>void askAI()} disabled={busy||!prompt.trim()}>{busy?"Gerando...":"Enviar ↑"}</button></div><small>Enter envia · Shift + Enter quebra linha</small></div></section>}
   {tab==="code"&&<section className="studio-code-view"><aside className="studio-file-rail"><div className="studio-file-heading"><b>ARQUIVOS</b><button onClick={addFile} disabled={busy}>＋</button></div>{files.map(f=><button key={f.path} className={selected?.path===f.path?"active":""} onClick={()=>setSelectedPath(f.path)}>{f.path}</button>)}<div className="studio-file-footer"><button onClick={exportFiles}>Exportar</button><button onClick={removeFile} disabled={!selected||busy}>Excluir</button></div></aside><div className="studio-editor-pane"><div className="studio-editor-title">{selected?.path||"Nenhum arquivo"}</div><textarea className="studio-editor" spellCheck={false} disabled={busy} value={selected?.content||""} onChange={e=>updateSelected(e.target.value)}/></div></section>}
-  {tab==="preview"&&<section className="studio-preview-view"><div className="studio-preview-toolbar"><span>◉ Prévia do projeto</span><button onClick={()=>setTab("code")}>‹/› Código</button></div>{html?<iframe title="Prévia do projeto" className="studio-preview-frame" sandbox="allow-scripts" srcDoc={preview}/>:<div className="studio-empty-preview">Projeto sem index.html. <button onClick={()=>setTab("chat")}>Criar com IA</button></div>}</section>}
+  {tab==="preview"&&<section className="studio-preview-view"><div className="studio-preview-toolbar"><span>◉ Prévia do projeto <small className={previewReady?"preview-state ready":"preview-state"}>{previewReady?"EXECUTANDO":"AGUARDANDO"}</small></span><div className="studio-preview-actions"><button onClick={()=>{setPreviewErrors([]);setPreviewReady(false);setPreviewReload(value=>value+1)}} disabled={!html}>↻ Atualizar</button><button onClick={()=>setTab("code")}>‹/› Código</button></div></div>{html?<><iframe key={previewReload} ref={previewFrameRef} title="Prévia do projeto" className="studio-preview-frame" sandbox="allow-scripts allow-forms allow-pointer-lock" srcDoc={preview}/>{previewErrors.length>0&&<div className="studio-preview-diagnostics"><div className="studio-diagnostics-head"><div><b>Console de execução</b><small>{previewErrors.length} problema(s) detectado(s)</small></div><div><button onClick={()=>setPreviewErrors([])}>Limpar</button><button className="diagnostics-fix" onClick={()=>void askAI("Corrija os erros reais detectados na prévia deste projeto. Preserve o objetivo e as funcionalidades existentes. Analise os arquivos atuais e altere somente os necessários.\n\nErros do navegador:\n"+previewErrors.map((error,index)=>(index+1)+". "+error).join("\n"))}>Corrigir com IA</button></div></div><ul>{previewErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>}</>:<div className="studio-empty-preview">Projeto sem index.html. <button onClick={()=>setTab("chat")}>Criar com IA</button></div>}</section>}
   <footer className="studio-statusbar"><span>● Projeto local</span><span>{files.length} arquivos</span><span>{status}</span></footer>
  </main>;
 }
