@@ -46,7 +46,7 @@ export default function WorkspacePage(){
     const parsed=JSON.parse(raw);
     if(parsed&&Array.isArray(parsed.files)&&parsed.files.length){
      // Restore persisted workspace after mount to avoid an SSR/localStorage mismatch.
-     setProject(parsed);
+     setProject(parsed); // eslint-disable-line react-hooks/set-state-in-effect
     }
    }
   }catch{localStorage.removeItem(STORAGE_KEY)}
