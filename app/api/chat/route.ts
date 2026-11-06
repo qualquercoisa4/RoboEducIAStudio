@@ -467,7 +467,7 @@ export async function POST(request: Request) {
     const requestedInstruction = typeof body.systemInstruction === "string" && body.systemInstruction.trim()
       ? body.systemInstruction.trim().slice(0, 5_000)
       : "Você é o RoboEduc AI, assistente educacional especializado em tecnologia, robótica, eletrônica, programação e ciências. Responda em português brasileiro, com precisão e exemplos práticos.";
-    const systemInstruction = requestedInstruction + "\n\n" + QUALITY_RULES;
+    const systemInstruction = requestedInstruction + "\n\n" + QUALITY_RULES + getTaskPlaybook(messages);
     const mode: WorkMode = body.mode === "fast" || body.mode === "deep" ? body.mode : "complete";
     const codeTask = isLikelyCodeTask(messages);
     const runtimeRepair = isRuntimeRepairRequest(messages);
