@@ -27,7 +27,7 @@ export default function Home() {
   const [sidebar, setSidebar] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<WorkMode>("complete");
-  const [selectedModel, setSelectedModel] = useState("cloudflare");
+  const [selectedModel, setSelectedModel] = useState("openrouter:qwen/qwen3-coder-next");
   const [openRouterReady, setOpenRouterReady] = useState(false);
   const [openAIReady, setOpenAIReady] = useState(false);
   const [geminiReady, setGeminiReady] = useState(false);
@@ -300,22 +300,23 @@ export default function Home() {
           <div className="local-ai-panel">
             <div>
               <b>{cloudReady ? "Infraestrutura de IA configurada" : "Configuração da IA pendente"}</b>
-              <small>{cloudReady ? "Alternância automática entre provedores quando houver instabilidade temporária." : "Configure um provedor de IA na Vercel para habilitar as respostas."}</small>
+              <small>{cloudReady || openRouterReady ? "Qwen3 Coder Next como principal, com Cloudflare e modelos alternativos como contingência." : "Configure OPENROUTER_API_KEY na Vercel para ativar o modelo principal."}</small>
             </div>
-            <span>{cloudReady ? "PRONTA" : "AGUARDANDO"}</span>
+            <span>{openRouterReady || cloudReady ? "PRONTA" : "AGUARDANDO"}</span>
           </div>
           {error && <div className="error-banner">{error}<button onClick={() => setError("")}>Fechar</button></div>}
           <div className="model-picker" aria-label="Modelo de inteligência artificial">
             <label htmlFor="model-choice">MODELO</label>
             <select id="model-choice" value={selectedModel} onChange={event => setSelectedModel(event.target.value)} disabled={loading}>
-              <option value="cloudflare">Qwen3 30B · Cloudflare</option>
+              <option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next · Principal para código</option>
+              <option value="cloudflare">Qwen3 30B · Cloudflare (reserva)</option>
               <option value="recursive/flint-v1.0:free">Flint · OpenRouter grátis</option>
               <option value="cohere/north-mini-code:free">North Mini Code · OpenRouter grátis</option>
               <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra · OpenRouter grátis</option>
               <option value="google/gemma-4-31b-it:free">Gemma 4 31B · OpenRouter grátis</option>
               <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash · Google (nível gratuito)</option>
             </select>
-            <small>{selectedModel === "cloudflare" ? "Cloudflare Workers AI" : selectedModel === "openai:gpt-5.6-luna" ? (openAIReady ? "OpenAI API · cobrança por tokens" : "Configure OPENAI_API_KEY na Vercel para liberar o modelo") : selectedModel.startsWith("gemini:") ? (geminiReady ? "Google Gemini API · Free Tier sujeito a cotas" : "Configure GEMINI_API_KEY na Vercel para liberar o modelo") : openRouterReady ? "OpenRouter · disponibilidade e limites variam por modelo" : "Configure OPENROUTER_API_KEY na Vercel para liberar os modelos"}</small>
+            <small>{selectedModel === "openrouter:qwen/qwen3-coder-next" ? (openRouterReady ? "Qwen3 Coder Next · OpenRouter · cobrança por uso" : "Configure OPENROUTER_API_KEY na Vercel para ativar o modelo principal") : selectedModel === "cloudflare" ? "Cloudflare Workers AI · reserva automática" : selectedModel === "openai:gpt-5.6-luna" ? (openAIReady ? "OpenAI API · cobrança por tokens" : "Configure OPENAI_API_KEY na Vercel para liberar o modelo") : selectedModel.startsWith("gemini:") ? (geminiReady ? "Google Gemini API · Free Tier sujeito a cotas" : "Configure GEMINI_API_KEY na Vercel para liberar o modelo") : openRouterReady ? "OpenRouter · disponibilidade e limites variam por modelo" : "Configure OPENROUTER_API_KEY na Vercel para liberar os modelos"}</small>
           </div>
           {selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:") && (
             <div className="web-search-toggle">
