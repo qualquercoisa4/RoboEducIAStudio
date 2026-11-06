@@ -777,7 +777,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       if (key >= "1" && key <= "8") chooseSlot(Number(key) - 1);
       if (key === "e" && !event.repeat) toggleInventory();
       if (key === "c" && !event.repeat) toggleCrafting();
-      if (key === "f") eatApple();
+      if (key === "f") actionsRef.current.eat?.();
       if (key === "r" && !event.repeat) actionsRef.current.interact?.();
       if (key === "escape" && document.pointerLockElement === renderer.domElement) document.exitPointerLock();
     };
