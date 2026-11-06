@@ -42,8 +42,12 @@ export default function WorkspacePage() {
   const previewHtml = useMemo(() => {
     let result = html;
     for (const file of files) {
-      if (file.path.endsWith(".css")) result = result.replace(new RegExp('<link[^>]+href=["\\']' + file.path.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&") + '["\\'][^>]*>', "g"), "<style>\n" + file.content + "\n</style>");
-      if (file.path.endsWith(".js")) result = result.replace(new RegExp('<script[^>]+src=["\\']' + file.path.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&") + '["\\'][^>]*><\\/script>', "g"), "<script>\n" + file.content + "\n<\\/script>");
+      if (file.path.endsWith(".css")) {
+        result = result.replace(`<link rel="stylesheet" href="${file.path}">`, "<style>\\n" + file.content + "\\n</style>");
+      }
+      if (file.path.endsWith(".js")) {
+        result = result.replace(`<script src="${file.path}"></script>`, "<script>\\n" + file.content + "\\n<\\/script>");
+      }
     }
     return result;
   }, [html, files]);
