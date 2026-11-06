@@ -373,10 +373,6 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     setRestart((value) => value + 1);
   };
 
-  useEffect(() => {
-    eatAppleRef.current = eatApple;
-  });
-
   const eatApple = () => {
     const current = inventoryRef.current;
     if (current.apple < 1) {
@@ -391,6 +387,10 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     changeVitals(0, 6);
     setNotice("Maçã consumida. A fome foi recuperada.");
   };
+
+  useEffect(() => {
+    eatAppleRef.current = eatApple;
+  });
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -707,7 +707,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       if (!target || !target.hit.face) return;
       const item = HOTBAR[selectedRef.current];
       if (item === "apple") {
-        eatApple();
+        eatAppleRef.current();
         return;
       }
       const blockType = PLACEABLE_BLOCKS[item];
