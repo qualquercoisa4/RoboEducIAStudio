@@ -25,21 +25,22 @@ export default function Home() {
  useEffect(()=>{try{const raw=localStorage.getItem(KEY);if(raw){const parsed=JSON.parse(raw) as Conversation[];if(Array.isArray(parsed)){setItems(parsed);setActiveId(parsed[0]?.id??"");}}}catch{} fetch("/api/status").then(r=>r.json()).then(x=>setCloudReady(Boolean(x.configured))).catch(()=>setCloudReady(false));},[]);
  useEffect(()=>{if(items.length)localStorage.setItem(KEY,JSON.stringify(items));else localStorage.removeItem(KEY);},[items]);
  useEffect(()=>{bottom.current?.scrollIntoView({behavior:"smooth",block:"end"});},[messages,loading]);
- const newChat=useCallback(()=>{cancelRef.current=true;const id=crypto.randomUUID();setItems(old=>[{id,title:"Nova conversa",messages:[],updatedAt:Date.now()},...old]);setActiveId(id);setInput("");setError("");setSidebar(false);area.current?.focus();},[]);
+ const newChat=useCallback(()=>{cancelRef.current=true;interruptRef.current?.interrupt();const id=crypto.randomUUID();setItems(old=>[{id,title:"Nova conversa",messages:[],updatedAt:Date.now()},...old]);setActiveId(id);setInput("");setError("");setSidebar(false);area.current?.focus();},[]);
  const patch=(id:string,msgs:Message[],title?:string)=>setItems(old=>old.map(x=>x.id===id?{...x,messages:msgs,title:title??x.title,updatedAt:Date.now()}:x).sort((a,b)=>b.updatedAt-a.updatedAt));
 
  async function loadLocalModel(){
   if(localState==="loading"||engineRef.current)return;
   setLocalState("loading");setError("");setProgress("Baixando modelo de linguagem…");
   try{
-   const {pipeline}=await import("@huggingface/transformers");
+   const {pipeline,InterruptableStoppingCriteria}=await import("@huggingface/transformers");
    const hasWebGPU="gpu" in navigator;
    const generator=await pipeline("text-generation","onnx-community/Qwen2.5-Coder-0.5B-Instruct",{
     dtype:"q4",
     ...(hasWebGPU?{device:"webgpu" as const}:{}),
-    progress_callback:(report)=>{if(report.status==="progress"&&typeof report.progress==="number")setProgress(`Baixando modelo: ${Math.round(report.progress)}%`);else if(report.status==="initiate")setProgress("Conectando ao repositório do modelo…");else if(report.status==="done")setProgress("Preparando pesos do modelo…");}
+    progress_callback:(report:{status:string;progress?:number})=>{if(report.status==="progress"&&typeof report.progress==="number")setProgress(`Baixando modelo: ${Math.round(report.progress)}%`);else if(report.status==="initiate")setProgress("Conectando ao repositório do modelo…");else if(report.status==="done")setProgress("Preparando pesos do modelo…");}
    });
    engineRef.current=generator as unknown as LocalGenerator;
+   interruptRef.current=new InterruptableStoppingCriteria();
    setLocalState("ready");setProgress(hasWebGPU?"Modelo carregado com aceleração WebGPU.":"Modelo carregado em modo CPU (pode ser mais lento).");
   }catch(e){console.error("Local model initialization failed",e);setLocalState("error");setError(e instanceof Error?e.message:"Não foi possível carregar o modelo local.");}
  }
@@ -56,12 +57,13 @@ export default function Home() {
    const append=(part:string)=>{answer+=part;patch(id,[...base,{role:"assistant",content:answer}]);};
    if(engineRef.current){
     const {TextStreamer}=await import("@huggingface/transformers");
+    interruptRef.current?.reset();
     const streamer=new TextStreamer(engineRef.current.tokenizer as never,{
      skip_prompt:true,skip_special_tokens:true,
      callback_function:(token:string)=>{if(!cancelRef.current)append(token);}
     });
-    await engineRef.current([{role:"system",content:SYSTEM},...base],{
-     max_new_tokens:700,do_sample:false,streamer
+    await engineRef.current([{role:"system",content:SYSTEM},...base.slice(-10)],{
+     max_new_tokens:700,do_sample:false,streamer,stopping_criteria:interruptRef.current
     });
    }else{
     const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json","Accept":"text/event-stream"},body:JSON.stringify({messages:base,systemInstruction:SYSTEM})});
