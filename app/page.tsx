@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import HtmlCodeRunner from "./components/HtmlCodeRunner";
+import MarkdownMessage from "./components/MarkdownMessage";
 
 type Message = { role: string; content: string };
 type Conversation = { id: string; title: string; messages: Message[]; updatedAt: number };
@@ -262,7 +263,7 @@ export default function Home() {
                   <div className="message-body">
                     <b>{message.role === "assistant" ? "ROBOEDUC AI" : "VOCÊ"}</b>
                     <div className="message-text">
-                      {message.content || (loading ? <span className="typing"><i /><i /><i /></span> : null)}
+                      {message.content ? <MarkdownMessage content={message.content} /> : (loading ? <span className="typing"><i /><i /><i /></span> : null)}
                     </div>
                     {message.role === "assistant" && message.content && (
                       <HtmlCodeRunner content={message.content} onAskFix={askForCodeFix} />
