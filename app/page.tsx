@@ -150,7 +150,7 @@ export default function Home() {
     if (!text || loading) return;
     if (!selectedProviderReady) {
       const requiredKey = selectedModel === "cloudflare" ? "CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN" : selectedModel === "openai:gpt-5.6-luna" ? "OPENAI_API_KEY" : selectedModel.startsWith("gemini:") ? "GEMINI_API_KEY" : "OPENROUTER_API_KEY";
-      setError("O provedor selecionado não está configurado. Adicione " + requiredKey + " nas variáveis de ambiente da Vercel.");
+      setError("O provedor selecionado não está configurado. Adicione " + requiredKey + " nas variáveis de ambiente do servidor.");
       return;
     }
 
@@ -312,7 +312,6 @@ export default function Home() {
               <div className="welcome-brand" aria-label="RoboEduc"><span>ROBO</span><strong><i>E</i><i>D</i><i>U</i><i>C</i></strong><small>ESCOLA DE PROGRAMAÇÃO E ROBÓTICA</small></div>
               <small>SEU LABORATÓRIO DE IDEIAS</small>
               <h1>Ideias que viram <em>projetos.</em></h1>
-              <p>Seu espaço para aprender, programar e criar com inteligência artificial.</p>
               <div className="starter-grid">
                 {starters.map(([icon, name, description]) => (
                   <button key={name} onClick={() => send(description)}>
@@ -356,27 +355,26 @@ export default function Home() {
         </div>
 
         <div className="composer-area">
-          <div className="local-ai-panel">
-            <div>
-              <b>{cloudReady ? "Infraestrutura de IA configurada" : "Configuração da IA pendente"}</b>
-              <small>{cloudReady || openRouterReady ? "Qwen3 Coder Next como principal, com Cloudflare e modelos alternativos como contingência." : "Configure OPENROUTER_API_KEY na Vercel para ativar o modelo principal."}</small>
-            </div>
-            <span>{openRouterReady || cloudReady ? "PRONTA" : "AGUARDANDO"}</span>
-          </div>
           {error && <div className="error-banner">{error}<button onClick={() => setError("")}>Fechar</button></div>}
-          <div className="model-picker" aria-label="Modelo de inteligência artificial">
-            <label htmlFor="model-choice">MODELO</label>
-            <select id="model-choice" value={selectedModel} onChange={event => setSelectedModel(event.target.value)} disabled={loading}>
-              <option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next · Principal para código</option>
-              <option value="cloudflare">Qwen3 30B · Cloudflare (reserva)</option>
-              <option value="recursive/flint-v1.0:free">Flint · OpenRouter grátis</option>
-              <option value="cohere/north-mini-code:free">North Mini Code · OpenRouter grátis</option>
-              <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra · OpenRouter grátis</option>
-              <option value="google/gemma-4-31b-it:free">Gemma 4 31B · OpenRouter grátis</option>
-              <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash · Google (nível gratuito)</option>
-            </select>
-            <small>{selectedModel === "openrouter:qwen/qwen3-coder-next" ? (openRouterReady ? "Qwen3 Coder Next · OpenRouter · cobrança por uso" : "Configure OPENROUTER_API_KEY na Vercel para ativar o modelo principal") : selectedModel === "cloudflare" ? "Cloudflare Workers AI · reserva automática" : selectedModel === "openai:gpt-5.6-luna" ? (openAIReady ? "OpenAI API · cobrança por tokens" : "Configure OPENAI_API_KEY na Vercel para liberar o modelo") : selectedModel.startsWith("gemini:") ? (geminiReady ? "Google Gemini API · Free Tier sujeito a cotas" : "Configure GEMINI_API_KEY na Vercel para liberar o modelo") : openRouterReady ? "OpenRouter · disponibilidade e limites variam por modelo" : "Configure OPENROUTER_API_KEY na Vercel para liberar os modelos"}</small>
-          </div>
+          <details className="model-settings">
+            <summary>
+              <span>MODELO</span>
+              <strong>{selectedModel === "openrouter:qwen/qwen3-coder-next" ? "Qwen3 Coder Next" : selectedModel === "cloudflare" ? "Qwen3 30B · Cloudflare" : selectedModel.startsWith("gemini:") ? "Gemini 3.8 Flash" : selectedModel.split("/").at(-1)?.replace(":free", "")}</strong>
+              <i aria-hidden="true">⌄</i>
+            </summary>
+            <div className="model-picker" aria-label="Modelo de inteligência artificial">
+              <label htmlFor="model-choice">SELECIONAR MODELO</label>
+              <select id="model-choice" value={selectedModel} onChange={event => setSelectedModel(event.target.value)} disabled={loading}>
+                <option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next · Principal para código</option>
+                <option value="cloudflare">Qwen3 30B · Cloudflare (reserva)</option>
+                <option value="recursive/flint-v1.0:free">Flint · OpenRouter grátis</option>
+                <option value="cohere/north-mini-code:free">North Mini Code · OpenRouter grátis</option>
+                <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra · OpenRouter grátis</option>
+                <option value="google/gemma-4-31b-it:free">Gemma 4 31B · OpenRouter grátis</option>
+                <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash · Google (nível gratuito)</option>
+              </select>
+            </div>
+          </details>
           {selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:") && (
             <div className="web-search-toggle">
               <label><input type="checkbox" checked={webSearch} onChange={event => setWebSearch(event.target.checked)} disabled={loading || !openRouterReady} /> Pesquisar na internet</label>
