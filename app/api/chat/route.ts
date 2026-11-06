@@ -201,6 +201,19 @@ function inspectCode(answer: string): string[] {
       if (openScripts !== closeScripts) issues.push("tag script HTML sem fechamento");
     }
 
+    if (isHtml) {
+      const robotBinding = /(?:const|let|var)\s+(\w+)\s*=\s*document\.getElementById\(\s*['"]robot['"]\s*\)/i.exec(code);
+      const rewriteMatch = /\w+\.innerHTML\s*=/i.exec(code);
+      const robotMarkupRecreated = /innerHTML\s*=\s*[\s\S]{0,500}?id\s*=\s*['"]robot['"]/i.test(code);
+      if (robotBinding && rewriteMatch && robotMarkupRecreated) {
+        const tail = code.slice(rewriteMatch.index + rewriteMatch[0].length);
+        const refreshed = new RegExp("\\b" + robotBinding[1] + "\\s*=\\s*document\\.(?:getElementById|querySelector)\\s*\\(", "i").test(tail);
+        if (!refreshed) {
+          issues.push("possível referência DOM obsoleta: o HTML recria o elemento #robot, mas a variável robot pode continuar apontando para o elemento antigo");
+        }
+      }
+    }
+
     const scripts = isHtml
       ? [...code.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)].map(match => match[1])
       : isScript ? [code] : [];
