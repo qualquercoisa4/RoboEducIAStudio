@@ -343,48 +343,65 @@ async function callModel(
   maxTokens: number,
   signal: AbortSignal,
   timeoutMs = 40_000,
-  selectedModel = "cloudflare"
+  selectedModel = "cloudflare",
+  useWebSearch = false
 ): Promise<string> {
-  const useOpenRouter = selectedModel !== "cloudflare";
-  const endpoint = useOpenRouter
-    ? "https://openrouter.ai/api/v1/chat/completions"
-    : `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${MODEL}`;
+  const useOpenAI = selectedModel === "openai:gpt-5.6-luna";
+  const useOpenRouter = selectedModel !== "cloudflare" && !useOpenAI;
+  const providerName = useOpenAI ? "OpenAI" : useOpenRouter ? "OpenRouter" : "Cloudflare Workers AI";
   const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
+  const openAIKey = process.env.OPENAI_API_KEY?.trim();
+  const selectedKey = useOpenAI ? openAIKey : useOpenRouter ? openRouterKey : apiToken;
+  if (!selectedKey) throw new Error("A chave de API do provedor " + providerName + " não está configurada na Vercel.");
+  if (!useOpenRouter && !useOpenAI && !accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID não está configurado na Vercel.");
+  const endpoint = useOpenAI
+    ? "https://api.openai.com/v1/chat/completions"
+    : useOpenRouter
+      ? "https://openrouter.ai/api/v1/chat/completions"
+      : "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/run/" + MODEL;
+  const requestBody = {
+    messages: [{ role: "system", content: systemInstruction }, ...messages],
+    ...(useOpenAI
+      ? { model: "gpt-5.6-luna", max_completion_tokens: maxTokens }
+      : useOpenRouter
+        ? { model: selectedModel, max_tokens: maxTokens }
+        : { max_tokens: maxTokens }),
+    ...(!useOpenAI ? { temperature: 0.2, top_p: 0.85 } : {}),
+    ...(useOpenRouter && useWebSearch ? { tools: [{ type: "openrouter:web_search" }] } : {}),
+    stream: true
+  };
   let upstream: Response;
   try {
     upstream = await fetch(endpoint, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${useOpenRouter ? openRouterKey : apiToken}`, "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify({
-      messages: [{ role: "system", content: systemInstruction }, ...messages],
-      ...(useOpenRouter ? { model: selectedModel, max_tokens: maxTokens } : { max_tokens: maxTokens }),
-      temperature: 0.2,
-      top_p: 0.85,
-      stream: true
-    }),
-    cache: "no-store",
-    signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+      method: "POST",
+      headers: { Authorization: "Bearer " + selectedKey, "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify(requestBody),
+      cache: "no-store",
+      signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
     });
   } catch (error) {
     if (signal.aborted) throw error;
     if (error instanceof Error && (error.name === "TimeoutError" || /timeout|timed out|aborted/i.test(error.message))) {
-      throw new Error("A IA demorou mais que o limite desta etapa. Tente novamente no modo Completo ou envie uma correção menor.");
+      throw new Error(providerName + " excedeu o tempo limite desta etapa. Modelos gratuitos podem ficar em fila ou sem capacidade; tente novamente ou selecione outro provedor.");
     }
     throw error;
   }
-
   if (!upstream.ok) {
-    const payload = await upstream.json().catch(() => null) as CloudflareError | null;
-    const detail = payload?.errors?.map(item => item.message).filter(Boolean).join("; ") ||
-      payload?.messages?.map(item => item.message).filter(Boolean).join("; ") ||
-      (payload as { error?: { message?: string } } | null)?.error?.message ||
-      `${useOpenRouter ? "OpenRouter" : "Cloudflare"} retornou HTTP ${upstream.status}.`;
-    console.error("Workers AI error:", upstream.status, detail);
-    const error = new Error(upstream.status === 401
-      ? (useOpenRouter ? "Chave OpenRouter inválida. Confira OPENROUTER_API_KEY na Vercel." : "Token Cloudflare inválido ou sem permissão Workers AI - Read.")
-      : upstream.status === 429
-        ? "Limite de uso ou cota do provedor atingido. Tente novamente mais tarde."
-        : detail);
+    const payload = await upstream.json().catch(() => null) as (CloudflareError & { error?: { message?: string; code?: string } }) | null;
+    const detail = payload?.error?.message || payload?.errors?.map(item => item.message).filter(Boolean).join("; ") || payload?.messages?.map(item => item.message).filter(Boolean).join("; ") || providerName + " retornou HTTP " + upstream.status + ".";
+    console.error(providerName + " API error:", upstream.status, detail);
+    const errorMessage = upstream.status === 401
+      ? "Chave ou token " + providerName + " inválido. Confira as variáveis de ambiente na Vercel."
+      : upstream.status === 402
+        ? "A conta do provedor " + providerName + " está sem créditos ou exige saldo. Confira o painel de faturamento."
+        : upstream.status === 404
+          ? "O modelo selecionado não foi encontrado ou não está disponível no provedor " + providerName + "."
+          : upstream.status === 429
+            ? "O provedor " + providerName + " limitou esta solicitação (HTTP 429). Pode ser limite de velocidade, cota do modelo gratuito ou saldo insuficiente; confira o painel do provedor."
+            : upstream.status >= 500
+              ? providerName + " está temporariamente indisponível (HTTP " + upstream.status + "). Tente novamente em instantes."
+              : detail;
+    const error = new Error(errorMessage);
     (error as Error & { status?: number }).status = upstream.status;
     throw error;
   }
@@ -393,7 +410,7 @@ async function callModel(
   } catch (error) {
     if (signal.aborted) throw error;
     if (error instanceof Error && (error.name === "TimeoutError" || /timeout|timed out|aborted/i.test(error.message))) {
-      throw new Error("A geração excedeu o tempo disponível. Tente novamente com um pedido menor ou no modo Completo.");
+      throw new Error(providerName + " excedeu o tempo de geração. Tente novamente com uma solicitação menor ou selecione outro modelo.");
     }
     throw error;
   }
@@ -404,17 +421,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Limite temporário atingido. Aguarde um minuto e tente novamente." }, { status: 429 });
   }
 
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
-  if (!accountId || !apiToken) {
-    return NextResponse.json({ error: "A API ainda não foi configurada. Cadastre CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN nas variáveis de ambiente da Vercel." }, { status: 503 });
-  }
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim() || "";
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim() || "";
 
   try {
-    const body = await request.json() as { messages?: ChatMessage[]; systemInstruction?: string; mode?: WorkMode; model?: string };
-    const allowedModels = ["cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free"];
+    const body = await request.json() as { messages?: ChatMessage[]; systemInstruction?: string; mode?: WorkMode; model?: string; webSearch?: boolean };
+    const allowedModels = ["cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free", "openai:gpt-5.6-luna"];
     const selectedModel = typeof body.model === "string" && allowedModels.includes(body.model) ? body.model : "cloudflare";
-    if (selectedModel !== "cloudflare" && !process.env.OPENROUTER_API_KEY?.trim()) {
+    if (selectedModel === "cloudflare" && (!accountId || !apiToken)) {
+      return NextResponse.json({ error: "Para usar Cloudflare, configure CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN na Vercel." }, { status: 503 });
+    }
+    if (selectedModel === "openai:gpt-5.6-luna" && !process.env.OPENAI_API_KEY?.trim()) {
+      return NextResponse.json({ error: "Para usar GPT-5.6 Luna, configure OPENAI_API_KEY na Vercel. A cobrança é feita por tokens na conta da OpenAI." }, { status: 503 });
+    }
+    if (selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !process.env.OPENROUTER_API_KEY?.trim()) {
       return NextResponse.json({ error: "Para usar modelos OpenRouter, cadastre OPENROUTER_API_KEY nas variáveis de ambiente da Vercel." }, { status: 503 });
     }
     if (!Array.isArray(body.messages) || body.messages.length === 0) {
@@ -449,16 +469,17 @@ export async function POST(request: Request) {
       status("context", "Preparando o contexto e os requisitos da solicitação.");
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
 
+      const generationTimeout = runtimeRepair ? 46_000 : selectedModel.endsWith(":free") ? 47_000 : mode === "deep" ? 36_000 : 42_000;
       let answer = await callModel(accountId, apiToken, messages, runtimeRepair
         ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
-        : systemInstruction, maxTokens, signal, runtimeRepair ? 48_000 : mode === "deep" ? 36_000 : 40_000, selectedModel);
+        : systemInstruction, maxTokens, signal, generationTimeout, selectedModel, Boolean(body.webSearch));
       if (!answer.trim()) throw new Error("O modelo encerrou a geração sem retornar texto. Tente novamente.");
 
       if (isLikelyCodeTask(messages, answer)) {
         status("review", "Verificando integridade dos blocos, sintaxe e sinais de código incompleto.");
         const findings = inspectCode(answer);
 
-        if (mode === "deep" && !runtimeRepair) {
+        if (mode === "deep" && !runtimeRepair && selectedModel === "cloudflare") {
           status("audit", "Executando uma auditoria adicional de lógica e integração do código.");
           try {
             const audit = await callModel(
@@ -499,7 +520,7 @@ export async function POST(request: Request) {
           try {
             const repaired = await callModel(accountId, apiToken, repairMessages,
               systemInstruction + "\\n\\nCORREÇÃO OBJETIVA: preserve o código e corrija somente os problemas apontados. Retorne o arquivo completo, sem auditoria adicional.",
-              repairTokens, signal, 8_000, selectedModel);
+              repairTokens, signal, 9_000, selectedModel);
             if (repaired.trim()) {
               const remainingIssues = inspectCode(repaired);
               if (remainingIssues.length) {
