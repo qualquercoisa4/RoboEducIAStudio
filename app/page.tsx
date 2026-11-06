@@ -29,9 +29,31 @@ const objectives: Choice[] = [
   { id: "Resolver desafios", title: "Resolver desafios", description: "Quebra-cabeças, lógica e criatividade", art: "🧩", tone: "yellow" },
   { id: "Vencer competições", title: "Vencer competições", description: "Disputar provas e bater recordes", art: "🏆", tone: "pink" },
 ];
-const cameras = ["Primeira pessoa", "Terceira pessoa", "Visão de cima", "Lateral 2D"];
-const gameplays = ["Construir e criar", "Explorar mapas", "Coletar itens", "Enfrentar inimigos", "Programar mecanismos", "Resolver puzzles", "Correr e competir", "Jogar em fases"];
-const difficulties = ["Fácil", "Médio", "Desafiador"];
+const cameras: Choice[] = [
+  { id: "Primeira pessoa", title: "Primeira pessoa", description: "Ver pelos olhos do personagem", art: "👁️", tone: "blue" },
+  { id: "Terceira pessoa", title: "Terceira pessoa", description: "Ver o personagem por trás", art: "🧍", tone: "mint" },
+  { id: "Visão de cima", title: "Visão de cima", description: "Ver o mapa do alto", art: "🗺️", tone: "yellow" },
+  { id: "Lateral 2D", title: "Lateral 2D", description: "Ver o jogo de lado", art: "🎮", tone: "purple" },
+];
+const gameplays: Choice[] = [
+  { id: "Construir e criar", title: "Construir e criar", description: "Montar coisas e inventar", art: "🧱", tone: "mint" },
+  { id: "Explorar mapas", title: "Explorar mapas", description: "Descobrir lugares novos", art: "🧭", tone: "blue" },
+  { id: "Coletar itens", title: "Coletar itens", description: "Juntar moedas e objetos", art: "💎", tone: "purple" },
+  { id: "Enfrentar inimigos", title: "Enfrentar inimigos", description: "Desviar e lutar", art: "🐛", tone: "orange" },
+  { id: "Programar mecanismos", title: "Programar mecanismos", description: "Controlar máquinas e robôs", art: "⚙️", tone: "yellow" },
+  { id: "Resolver puzzles", title: "Resolver puzzles", description: "Encontrar soluções", art: "🧩", tone: "pink" },
+  { id: "Correr e competir", title: "Correr e competir", description: "Chegar em primeiro lugar", art: "🏁", tone: "orange" },
+  { id: "Jogar em fases", title: "Jogar em fases", description: "Passar por várias etapas", art: "🎯", tone: "blue" },
+];
+const difficulties: Choice[] = [
+  { id: "Fácil", title: "Fácil", description: "Para começar", art: "🐣", tone: "mint" },
+  { id: "Médio", title: "Médio", description: "Um desafio equilibrado", art: "🚀", tone: "blue" },
+  { id: "Desafiador", title: "Desafiador", description: "Para quem gosta de desafio", art: "🔥", tone: "orange" },
+];
+function emojiImage(emoji: string) {
+  const code = Array.from(emoji).map(char => char.codePointAt(0)!.toString(16)).filter(code => code !== "fe0f").join("-");
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${code}.svg`;
+}
 const initial: Answers = { style: "", objective: "", camera: "Terceira pessoa", gameplay: ["Explorar mapas", "Construir e criar"], difficulty: "Médio", extra: "", name: "" };
 const steps = ["Estilo", "Objetivo", "Como jogar", "Detalhes", "Pronto!"];
 
@@ -174,7 +196,7 @@ export default function Home() {
           <div className="wizard-question"><span>01</span><div><h2>Qual estilo vai ter o seu jogo?</h2><p>Escolha o tipo de aventura que mais combina com você.</p></div></div>
           <div className="choice-grid style-grid">
             {styles.map((item, index) => <button key={item.id} className={`choice-card ${item.tone} ${answers.style === item.id ? "selected" : ""}`} onClick={() => update("style", item.id)}>
-              <span className="choice-art"><i>{item.art}</i><b>{index === 0 ? "▦ ▦ ▦" : index === 1 ? "◆ ◇ ◆" : index === 2 ? "✦ ✧ ✦" : index === 3 ? "➜ ➜" : index === 4 ? "◉ ◉" : "✧ ✦"}</b></span>
+              <span className="choice-art"><img src={emojiImage(item.art)} alt="" loading="lazy" /><b>{index === 0 ? "▦ ▦ ▦" : index === 1 ? "◆ ◇ ◆" : index === 2 ? "✦ ✧ ✦" : index === 3 ? "➜ ➜" : index === 4 ? "◉ ◉" : "✧ ✦"}</b></span>
               <span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
             </button>)}
           </div>
@@ -184,20 +206,20 @@ export default function Home() {
           <div className="wizard-question"><span>02</span><div><h2>O que você quer fazer no jogo?</h2><p>Qual será a missão mais importante?</p></div></div>
           <div className="choice-grid objective-grid">
             {objectives.map(item => <button key={item.id} className={`choice-card objective-card ${item.tone} ${answers.objective === item.id ? "selected" : ""}`} onClick={() => update("objective", item.id)}>
-              <span className="objective-art">{item.art}</span><span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
+              <span className="objective-art"><img src={emojiImage(item.art)} alt="" loading="lazy" /></span><span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
             </button>)}
           </div>
         </div>}
 
         {step === 2 && <div className="wizard-panel">
           <div className="wizard-question"><span>03</span><div><h2>Como será a aventura?</h2><p>Escolha a câmera e o que o jogador poderá fazer.</p></div></div>
-          <div className="field-block"><h3>Como vamos enxergar o jogo?</h3><div className="pill-options">{cameras.map(item => <button key={item} className={answers.camera === item ? "active" : ""} onClick={() => update("camera", item)}>{item}</button>)}</div></div>
-          <div className="field-block"><h3>O que o jogador poderá fazer?</h3><p className="field-hint">Pode escolher mais de uma opção.</p><div className="pill-options gameplay-options">{gameplays.map(item => <button key={item} className={answers.gameplay.includes(item) ? "active" : ""} onClick={() => toggleGameplay(item)}>{answers.gameplay.includes(item) ? "✓ " : "+ "}{item}</button>)}</div></div>
+          <div className="field-block"><h3>Como vamos enxergar o jogo?</h3><div className="visual-option-grid camera-grid">{cameras.map(item => <button key={item.id} className={`visual-option ${answers.camera === item.id ? "active" : ""}`} onClick={() => update("camera", item.id)}><img src={emojiImage(item.art)} alt="" loading="lazy" /><strong>{item.title}</strong><small>{item.description}</small></button>)}</div></div>
+          <div className="field-block"><h3>O que o jogador poderá fazer?</h3><p className="field-hint">Pode escolher mais de uma opção.</p><div className="visual-option-grid gameplay-grid">{gameplays.map(item => <button key={item.id} className={`visual-option ${answers.gameplay.includes(item.id) ? "active" : ""}`} onClick={() => toggleGameplay(item.id)}><img src={emojiImage(item.art)} alt="" loading="lazy" /><strong>{item.title}</strong><small>{item.description}</small><span className="visual-option-check">{answers.gameplay.includes(item.id) ? "✓" : "+"}</span></button>)}</div></div>
         </div>}
 
         {step === 3 && <div className="wizard-panel">
           <div className="wizard-question"><span>04</span><div><h2>Vamos personalizar!</h2><p>Mais alguns detalhes para deixar o jogo com a sua cara.</p></div></div>
-          <div className="field-block"><h3>Qual será a dificuldade?</h3><div className="pill-options">{difficulties.map(item => <button key={item} className={answers.difficulty === item ? "active" : ""} onClick={() => update("difficulty", item)}>{item}</button>)}</div></div>
+          <div className="field-block"><h3>Qual será a dificuldade?</h3><div className="visual-option-grid difficulty-grid">{difficulties.map(item => <button key={item.id} className={`visual-option ${answers.difficulty === item.id ? "active" : ""}`} onClick={() => update("difficulty", item.id)}><img src={emojiImage(item.art)} alt="" loading="lazy" /><strong>{item.title}</strong><small>{item.description}</small></button>)}</div></div>
           <div className="field-block"><h3>Como o jogo vai se chamar?</h3><input className="wizard-input" value={answers.name} onChange={e => update("name", e.target.value)} placeholder="Ex.: Aventura dos Robôs (opcional)" maxLength={60} /></div>
           <div className="field-block"><h3>Tem mais alguma ideia?</h3><textarea className="wizard-input wizard-textarea" value={answers.extra} onChange={e => update("extra", e.target.value)} placeholder="Ex.: Quero um robô que consiga voar e coletar cristais..." maxLength={500} rows={3} /></div>
         </div>}
