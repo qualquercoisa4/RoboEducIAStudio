@@ -23,7 +23,7 @@ type StreamEvent = ProgressEvent | TokenEvent | ErrorEvent | WorkspacePlanEvent 
 const MODEL = process.env.CLOUDFLARE_MODEL?.trim() || "@cf/qwen/qwen3-30b-a3b-fp8";
 const MAX_MESSAGES = 14;
 const MAX_MESSAGE_LENGTH = 40_000;
-const MAX_CONTEXT_CHARS = 28_000;
+const MAX_CONTEXT_CHARS = 48_000;
 const MAX_OUTPUT_TOKENS = 6_144;
 const MAX_DEEP_OUTPUT_TOKENS = 8_192;
 const MAX_REPAIR_TOKENS = 4_096;
@@ -148,13 +148,13 @@ function trimContext(messages: ChatMessage[]) {
   let remaining = MAX_CONTEXT_CHARS;
   const selected: ChatMessage[] = [];
 
-  for (let index = recent.length - 1; index >= 0 && remaining > 0; index -= 1) {
+  // Keep message boundaries intact. Never cut a user instruction or code sample
+  // in the middle; discard older messages that do not fit instead.
+  for (let index = recent.length - 1; index >= 0; index -= 1) {
     const message = recent[index];
-    const content = message.content.length > remaining
-      ? message.content.slice(-remaining)
-      : message.content;
-    selected.unshift({ role: message.role, content });
-    remaining -= content.length;
+    if (message.content.length > remaining) continue;
+    selected.unshift({ role: message.role, content: message.content });
+    remaining -= message.content.length;
   }
   return selected;
 }

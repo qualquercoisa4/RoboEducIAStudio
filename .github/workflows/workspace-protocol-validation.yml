@@ -27,6 +27,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Validate workspace protocol
         run: npm run test:workspace
+      - name: Lint
+        run: npm run lint
       - name: Production build
         run: npm run build
         env:
