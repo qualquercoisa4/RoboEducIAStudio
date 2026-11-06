@@ -546,6 +546,41 @@ export async function POST(request: Request) {
       }
       if (!answer.trim()) throw new Error("O modelo encerrou a geração sem retornar texto. Tente novamente.");
 
+      if (body.structuredOutput === true) {
+        const validatePatch = (raw: string) => {
+          const start = raw.indexOf("{");
+          const end = raw.lastIndexOf("}");
+          if (start < 0 || end <= start) return false;
+          try {
+            const value = JSON.parse(raw.slice(start, end + 1)) as { changes?: unknown; files?: unknown; deletes?: unknown };
+            return Boolean(value && typeof value === "object" &&
+              (Array.isArray(value.changes) || Array.isArray(value.files)) &&
+              (value.deletes === undefined || Array.isArray(value.deletes)));
+          } catch { return false; }
+        };
+        if (!validatePatch(answer)) {
+          status("repair-json", "A resposta veio em formato inválido. Tentando recuperar o pacote de arquivos.");
+          const repairMessages: ChatMessage[] = [
+            ...messages,
+            { role: "assistant", content: answer },
+            { role: "user", content: "Converta a resposta anterior em JSON estritamente válido, sem markdown. Preserve o código e os caminhos. Formato: {\\"summary\\":\\"resumo\\",\\"changes\\":[{\\"path\\":\\"arquivo.ext\\",\\"content\\":\\"código completo\\\"}],\\"deletes\\":[]}. Escape corretamente aspas, barras invertidas e quebras de linha dentro das strings. Retorne somente JSON." }
+          ];
+          try {
+            const fixed = await callModel(accountId, apiToken, repairMessages,
+              "Converta a resposta anterior em um único objeto JSON válido. Preserve exatamente o código. Não inclua markdown nem explicações.",
+              Math.min(maxTokens, 8192), signal, 45000, activeModel, false, undefined, true);
+            if (!validatePatch(fixed)) throw new Error("JSON ainda inválido");
+            answer = fixed;
+            send({ type: "reset" });
+            for (const chunk of (answer.match(/[\\s\\S]{1,96}/g) ?? [answer])) send({ type: "token", response: chunk });
+            status("repair-json-success", "Pacote recuperado. Aplicando alterações.");
+          } catch (repairError) {
+            if (signal.aborted) throw repairError;
+            throw new Error("A IA retornou um pacote inválido e a recuperação automática também falhou. Tente outro modelo.");
+          }
+        }
+      }
+
       if (isLikelyCodeTask(messages, answer)) {
         status("review", "Verificando integridade dos blocos, sintaxe e sinais de código incompleto.");
         const findings = inspectCode(answer);
