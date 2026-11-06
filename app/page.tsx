@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import HtmlCodeRunner from "./components/HtmlCodeRunner";
 import MarkdownMessage from "./components/MarkdownMessage";
@@ -18,9 +18,76 @@ const starters = [
 ];
 const SYSTEM = "Você é o RoboEduc AI, assistente educacional especializado em tecnologia, robótica, eletrônica, programação, ciências e criação de projetos. Responda em português brasileiro, com precisão e exemplos práticos. Ao gerar código, forneça soluções completas, explique onde salvar e como executar. Se não souber, diga que não sabe. Não invente testes ou resultados.";
 const titleOf = (s: string) => s.trim().replace(/\s+/g, " ").slice(0, 42) || "Nova conversa";
+const EMPTY_HISTORY: Conversation[] = [];
+let historyCacheRaw: string | null | undefined;
+let historyCache: Conversation[] = EMPTY_HISTORY;
+
+function getConversationHistory(): Conversation[] {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(KEY);
+  } catch {
+    return historyCache;
+  }
+  if (raw === historyCacheRaw) return historyCache;
+  historyCacheRaw = raw;
+  if (!raw) {
+    historyCache = EMPTY_HISTORY;
+    return historyCache;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      historyCache = parsed as Conversation[];
+      return historyCache;
+    }
+  } catch {
+    // Invalid saved history is discarded below.
+  }
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // Keep the in-memory empty history when browser storage is unavailable.
+  }
+  historyCacheRaw = null;
+  historyCache = EMPTY_HISTORY;
+  return historyCache;
+}
+
+function getServerConversationHistory(): Conversation[] {
+  return EMPTY_HISTORY;
+}
+
+function subscribeToConversationHistory(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener("roboeduc-history-change", callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("roboeduc-history-change", callback);
+  };
+}
+
 
 export default function Home() {
-  const [items, setItems] = useState<Conversation[]>([]);
+  const items = useSyncExternalStore(subscribeToConversationHistory, getConversationHistory, getServerConversationHistory);
+  const setItems = (update: Conversation[] | ((previous: Conversation[]) => Conversation[])) => {
+    const previous = getConversationHistory();
+    const next = typeof update === "function" ? update(previous) : update;
+    const serialized = JSON.stringify(next);
+    try {
+      if (next.length) localStorage.setItem(KEY, serialized);
+      else localStorage.removeItem(KEY);
+      historyCacheRaw = next.length ? serialized : null;
+    } catch {
+      try {
+        historyCacheRaw = localStorage.getItem(KEY);
+      } catch {
+        historyCacheRaw = null;
+      }
+    }
+    historyCache = next.length ? next : EMPTY_HISTORY;
+    window.dispatchEvent(new Event("roboeduc-history-change"));
+  };
   const [activeId, setActiveId] = useState("");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -37,34 +104,17 @@ export default function Home() {
   const bottom = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const controllerRef = useRef<AbortController | null>(null);
-  const active = items.find(item => item.id === activeId);
+  const activeConversationId = activeId || items[0]?.id || "";
+  const active = items.find(item => item.id === activeConversationId);
   const messages = useMemo(() => active?.messages ?? [], [active]);
   const selectedProviderReady = selectedModel === "cloudflare" ? cloudReady : selectedModel === "openai:gpt-5.6-luna" ? openAIReady : selectedModel.startsWith("gemini:") ? geminiReady : openRouterReady;
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Conversation[];
-        if (Array.isArray(parsed)) {
-          // Restore client-only conversation history after mount.
-          setItems(parsed);
-          setActiveId(parsed[0]?.id ?? "");
-        }
-      }
-    } catch {
-      localStorage.removeItem(KEY);
-    }
     fetch("/api/status", { cache: "no-store" })
       .then(response => response.json())
       .then(data => { setCloudReady(Boolean(data.configured)); setOpenRouterReady(Boolean(data.openrouterConfigured)); setOpenAIReady(Boolean(data.openaiConfigured)); setGeminiReady(Boolean(data.geminiConfigured)); })
       .catch(() => setCloudReady(false));
   }, []);
-
-  useEffect(() => {
-    if (items.length) localStorage.setItem(KEY, JSON.stringify(items));
-    else localStorage.removeItem(KEY);
-  }, [items]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -100,7 +150,7 @@ export default function Home() {
       return;
     }
 
-    let id = activeId;
+    let id = activeConversationId;
     const existing = items.find(item => item.id === id);
     if (!existing) {
       id = crypto.randomUUID();
@@ -207,7 +257,7 @@ export default function Home() {
   const remove = (id: string) => {
     const remaining = items.filter(item => item.id !== id);
     setItems(remaining);
-    if (id === activeId) setActiveId(remaining[0]?.id ?? "");
+    if (id === activeConversationId) setActiveId(remaining[0]?.id ?? "");
   };
   const askForCodeFix = (code: string, errors: string[]) => {
     const details = errors.map((item, index) => `${index + 1}. ${item}`).join("\n");
@@ -225,7 +275,7 @@ export default function Home() {
         <div className="history-heading">RECENTES</div>
         <div className="history-list">
           {items.map(item => (
-            <div className={`history-item ${item.id === activeId ? "current" : ""}`} key={item.id}>
+            <div className={`history-item ${item.id === activeConversationId ? "current" : ""}`} key={item.id}>
               <button onClick={() => { setActiveId(item.id); setSidebar(false); setError(""); }}>
                 ◌ <span>{item.title}</span>
               </button>
