@@ -109,9 +109,9 @@ export default function Home() {
 
     const controller = new AbortController();
     controllerRef.current = controller;
+    let answer = "";
 
     try {
-      let answer = "";
       const append = (part: string) => {
         answer += part;
         patch(id, [...base, { role: "assistant", content: answer }]);
