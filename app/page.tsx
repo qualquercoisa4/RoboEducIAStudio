@@ -15,40 +15,40 @@ type Answers = {
 
 const styles: Choice[] = [
   { id: "Minecraft", title: "Minecraft", description: "Blocos, construção e sobrevivência", art: "🧱", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "mint" },
-  { id: "Roblox", title: "Roblox", description: "Obbys, avatares e mundos 3D", art: "🧍", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "blue" },
-  { id: "Fortnite", title: "Fortnite", description: "Ação, arenas e desafios", art: "🎯", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "purple" },
-  { id: "Sonic", title: "Sonic", description: "Velocidade, saltos e fases", art: "💨", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "yellow" },
-  { id: "Corrida", title: "Corrida", description: "Veículos, pistas e desafios", art: "🏎️", image: "https://images.cgames.de/images/gsgp/287/highrise-city_6141338.jpg", tone: "orange" },
-  { id: "Meu próprio estilo", title: "Inventar um estilo", description: "Criar algo totalmente diferente", art: "✨", image: "https://images.cgames.de/images/gsgp/287/highrise-city_6141338.jpg", tone: "pink" },
+  { id: "Roblox", title: "Roblox", description: "Obbys, avatares e mundos 3D", art: "🧍", image: "https://fiverr-res.cloudinary.com/images/t_main1%2Cq_auto%2Cf_auto%2Cq_auto%2Cf_auto/gigs/486006255/original/16eba4155a42dd9d0baa8df0b3fe154c8ca08c16/create-a-detailed-roblox-obby-theme-fo.png", tone: "blue" },
+  { id: "Fortnite", title: "Fortnite", description: "Ação, arenas e desafios", art: "🎯", image: "https://imagenes.businessinsider.es/files/og_thumbnail/uploads/imagenes/2022/10/11/68bc2bb3b5f6d.jpeg", tone: "purple" },
+  { id: "Sonic", title: "Sonic", description: "Velocidade, saltos e fases", art: "💨", image: "https://static.wixstatic.com/media/213e41_24f91ea8d5e44aebb3bd9cf3ef3733ac~mv2.png/v1/fill/w_568%2Ch_398%2Cal_c%2Cq_85%2Cusm_0.66_1.00_0.01%2Cenc_avif%2Cquality_auto/213e41_24f91ea8d5e44aebb3bd9cf3ef3733ac~mv2.png", tone: "yellow" },
+  { id: "Corrida", title: "Corrida", description: "Veículos, pistas e desafios", art: "🏎️", image: "https://imag.malavida.com/mvimgbig/download-fs/forza-horizon-5-38804-8.jpg", tone: "orange" },
+  { id: "Meu próprio estilo", title: "Inventar um estilo", description: "Criar algo totalmente diferente", art: "✨", image: "https://www.pcgames.de/screenshots/1280x1024/2015/01/cities_skylines_simulation_0002-pc-games.jpg", tone: "pink" },
 ];
 const objectives: Choice[] = [
-  { id: "Construir robôs", title: "Construir robôs", description: "Montar máquinas e testar invenções", art: "🤖", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "blue" },
-  { id: "Construir cidades", title: "Construir cidades", description: "Criar casas, ruas e cidades inteligentes", art: "🏙️", image: "https://images.cgames.de/images/gsgp/287/highrise-city_6141338.jpg", tone: "purple" },
-  { id: "Aprender robótica", title: "Aprender robótica", description: "Usar sensores, motores e programação", art: "⚙️", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "mint" },
-  { id: "Explorar e sobreviver", title: "Explorar e sobreviver", description: "Descobrir lugares e superar perigos", art: "🧭", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "orange" },
-  { id: "Resolver desafios", title: "Resolver desafios", description: "Quebra-cabeças, lógica e criatividade", art: "🧩", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "yellow" },
-  { id: "Vencer competições", title: "Vencer competições", description: "Disputar provas e bater recordes", art: "🏆", image: "https://images.cgames.de/images/gsgp/287/highrise-city_6141338.jpg", tone: "pink" },
+  { id: "Construir robôs", title: "Construir robôs", description: "Montar máquinas e testar invenções", art: "🤖", image: "https://cdn.mos.cms.futurecdn.net/MbJpJBUEXwURJeGhQUvJjn-1200-80.png", tone: "blue" },
+  { id: "Construir cidades", title: "Construir cidades", description: "Criar casas, ruas e cidades inteligentes", art: "🏙️", image: "https://www.pcgames.de/screenshots/1280x1024/2015/01/cities_skylines_simulation_0002-pc-games.jpg", tone: "purple" },
+  { id: "Aprender robótica", title: "Aprender robótica", description: "Usar sensores, motores e programação", art: "⚙️", image: "https://www.vex.com.cn/app/uploads/2025/02/premium-viqc-virtual-skills.webp", tone: "mint" },
+  { id: "Explorar e sobreviver", title: "Explorar e sobreviver", description: "Descobrir lugares e superar perigos", art: "🧭", image: "https://multiplayer.net-cdn.it/thumbs/images/2023/11/30/outcast-a-new-beginning_1_jpg_1400x0_q85.jpg", tone: "orange" },
+  { id: "Resolver desafios", title: "Resolver desafios", description: "Quebra-cabeças, lógica e criatividade", art: "🧩", image: "https://images.igdb.com/igdb/image/upload/t_1080p/scs2p9.jpg", tone: "yellow" },
+  { id: "Vencer competições", title: "Vencer competições", description: "Disputar provas e bater recordes", art: "🏆", image: "https://s2.dmcdn.net/v/OVvNJ1enRRkKbJMlK/x1080", tone: "pink" },
 ];
 const cameras: Choice[] = [
   { id: "Primeira pessoa", title: "Primeira pessoa", description: "Ver pelos olhos do personagem", art: "👁️", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "blue" },
-  { id: "Terceira pessoa", title: "Terceira pessoa", description: "Ver o personagem por trás", art: "🧍", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "mint" },
-  { id: "Visão de cima", title: "Visão de cima", description: "Ver o mapa do alto", art: "🗺️", image: "https://images.cgames.de/images/gsgp/287/highrise-city_6141338.jpg", tone: "yellow" },
-  { id: "Lateral 2D", title: "Lateral 2D", description: "Ver o jogo de lado", art: "🎮", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "purple" },
+  { id: "Terceira pessoa", title: "Terceira pessoa", description: "Ver o personagem por trás", art: "🧍", image: "https://fiverr-res.cloudinary.com/images/t_main1%2Cq_auto%2Cf_auto%2Cq_auto%2Cf_auto/gigs/486006255/original/16eba4155a42dd9d0baa8df0b3fe154c8ca08c16/create-a-detailed-roblox-obby-theme-fo.png", tone: "mint" },
+  { id: "Visão de cima", title: "Visão de cima", description: "Ver o mapa do alto", art: "🗺️", image: "https://www.pcgames.de/screenshots/1280x1024/2015/01/cities_skylines_simulation_0002-pc-games.jpg", tone: "yellow" },
+  { id: "Lateral 2D", title: "Lateral 2D", description: "Ver o jogo de lado", art: "🎮", image: "https://images.igdb.com/igdb/image/upload/t_1080p/scs2p9.jpg", tone: "purple" },
 ];
 const gameplays: Choice[] = [
-  { id: "Construir e criar", title: "Construir e criar", description: "Montar coisas e inventar", art: "🧱", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "mint" },
-  { id: "Explorar mapas", title: "Explorar mapas", description: "Descobrir lugares novos", art: "🧭", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "blue" },
-  { id: "Coletar itens", title: "Coletar itens", description: "Juntar moedas e objetos", art: "💎", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "purple" },
-  { id: "Enfrentar inimigos", title: "Enfrentar inimigos", description: "Desviar e lutar", art: "🐛", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "orange" },
-  { id: "Programar mecanismos", title: "Programar mecanismos", description: "Controlar máquinas e robôs", art: "⚙️", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "yellow" },
-  { id: "Resolver puzzles", title: "Resolver puzzles", description: "Encontrar soluções", art: "🧩", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "pink" },
-  { id: "Correr e competir", title: "Correr e competir", description: "Chegar em primeiro lugar", art: "🏁", image: "https://images.cgames.de/images/gsgp/287/highrise-city_6141338.jpg", tone: "orange" },
-  { id: "Jogar em fases", title: "Jogar em fases", description: "Passar por várias etapas", art: "🎯", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "blue" },
+  { id: "Construir e criar", title: "Construir e criar", description: "Montar coisas e inventar", art: "🧱", image: "https://staticg.sportskeeda.com/editor/2024/01/6bf3f-17063410066112-1920.jpg?w=640", tone: "mint" },
+  { id: "Explorar mapas", title: "Explorar mapas", description: "Descobrir lugares novos", art: "🧭", image: "https://multiplayer.net-cdn.it/thumbs/images/2023/11/30/outcast-a-new-beginning_1_jpg_1400x0_q85.jpg", tone: "blue" },
+  { id: "Coletar itens", title: "Coletar itens", description: "Juntar moedas e objetos", art: "💎", image: "https://images.igdb.com/igdb/image/upload/t_1080p/scs2p9.jpg", tone: "purple" },
+  { id: "Enfrentar inimigos", title: "Enfrentar inimigos", description: "Desviar e lutar", art: "🐛", image: "https://eu-images.contentstack.com/v3/assets/bltbc1876152fcd9f07/blt21d2936e2d615162/67ab3e72283a8f4d034e8163/SouthofMidnight_Preview_Screenshot_28_Combat_Larva_Ravager_Haints.png", tone: "orange" },
+  { id: "Programar mecanismos", title: "Programar mecanismos", description: "Controlar máquinas e robôs", art: "⚙️", image: "https://www.vex.com.cn/app/uploads/2025/02/premium-viqc-virtual-skills.webp", tone: "yellow" },
+  { id: "Resolver puzzles", title: "Resolver puzzles", description: "Encontrar soluções", art: "🧩", image: "https://images.squarespace-cdn.com/content/v1/6371c1aaf44e9e0252208a01/bad5c335-68bb-45da-9623-dced1492f5fc/screenshot-24.png", tone: "pink" },
+  { id: "Correr e competir", title: "Correr e competir", description: "Chegar em primeiro lugar", art: "🏁", image: "https://imag.malavida.com/mvimgbig/download-fs/forza-horizon-5-38804-8.jpg", tone: "orange" },
+  { id: "Jogar em fases", title: "Jogar em fases", description: "Passar por várias etapas", art: "🎯", image: "https://s2.dmcdn.net/v/OVvNJ1enRRkKbJMlK/x1080", tone: "blue" },
 ];
 const difficulties: Choice[] = [
-  { id: "Fácil", title: "Fácil", description: "Para começar", art: "🐣", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "mint" },
+  { id: "Fácil", title: "Fácil", description: "Para começar", art: "🐣", image: "https://images.squarespace-cdn.com/content/v1/6371c1aaf44e9e0252208a01/bad5c335-68bb-45da-9623-dced1492f5fc/screenshot-24.png", tone: "mint" },
   { id: "Médio", title: "Médio", description: "Um desafio equilibrado", art: "🚀", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "blue" },
-  { id: "Desafiador", title: "Desafiador", description: "Para quem gosta de desafio", art: "🔥", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "orange" },
+  { id: "Desafiador", title: "Desafiador", description: "Para quem gosta de desafio", art: "🔥", image: "https://eu-images.contentstack.com/v3/assets/bltbc1876152fcd9f07/blt21d2936e2d615162/67ab3e72283a8f4d034e8163/SouthofMidnight_Preview_Screenshot_28_Combat_Larva_Ravager_Haints.png", tone: "orange" },
 ];
 function emojiImage(emoji: string) { return emoji; }
 const initial: Answers = { style: "", objective: "", camera: "Terceira pessoa", gameplay: ["Explorar mapas", "Construir e criar"], difficulty: "Médio", extra: "", name: "" };
@@ -193,7 +193,7 @@ export default function Home() {
           <div className="wizard-question"><span>01</span><div><h2>Qual estilo vai ter o seu jogo?</h2><p>Escolha o tipo de aventura que mais combina com você.</p></div></div>
           <div className="choice-grid style-grid">
             {styles.map((item, index) => <button key={item.id} className={`choice-card ${item.tone} ${answers.style === item.id ? "selected" : ""}`} onClick={() => update("style", item.id)}>
-              <span className="choice-art screenshot-art"><img src={item.image} alt={`Imagem de gameplay: ${item.title}`} loading="lazy" /><b>{index === 0 ? "▦ ▦ ▦" : index === 1 ? "◆ ◇ ◆" : index === 2 ? "✦ ✧ ✦" : index === 3 ? "➜ ➜" : index === 4 ? "◉ ◉" : "✧ ✦"}</b></span>
+              <span className="choice-art screenshot-art"><img src={item.image} alt={`Captura de gameplay: ${item.title}`} loading="lazy" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /><b>{index === 0 ? "▦ ▦ ▦" : index === 1 ? "◆ ◇ ◆" : index === 2 ? "✦ ✧ ✦" : index === 3 ? "➜ ➜" : index === 4 ? "◉ ◉" : "✧ ✦"}</b></span>
               <span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
             </button>)}
           </div>
@@ -203,7 +203,7 @@ export default function Home() {
           <div className="wizard-question"><span>02</span><div><h2>O que você quer fazer no jogo?</h2><p>Qual será a missão mais importante?</p></div></div>
           <div className="choice-grid objective-grid">
             {objectives.map(item => <button key={item.id} className={`choice-card objective-card ${item.tone} ${answers.objective === item.id ? "selected" : ""}`} onClick={() => update("objective", item.id)}>
-              <span className="objective-art screenshot-art"><img src={item.image} alt={`Imagem de gameplay: ${item.title}`} loading="lazy" /></span><span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
+              <span className="objective-art screenshot-art"><img src={item.image} alt={`Captura de gameplay: ${item.title}`} loading="lazy" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /></span><span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
             </button>)}
           </div>
         </div>}
