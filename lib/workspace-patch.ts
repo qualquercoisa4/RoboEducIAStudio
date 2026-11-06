@@ -67,10 +67,22 @@ export function validateProjectFiles(input: unknown): WorkspaceFileSnapshot[] {
 function extractWorkspaceJson(raw: string): string {
   const value = raw.trim();
   const fence = String.fromCharCode(96).repeat(3);
-  const fenced = value.match(/^\\x60{3}(?:json)?\\s*([\\s\\S]*?)\\s*\\x60{3}$/i);
-  if (fenced) return fenced[1].trim();
+
   if (value.startsWith(fence)) {
-    throw new Error("O manifesto foi retornado com um bloco Markdown incompleto.");
+    const firstLineEnd = value.indexOf("\\n");
+    const closingFence = value.lastIndexOf(fence);
+    if (
+      firstLineEnd < 0 ||
+      closingFence <= firstLineEnd ||
+      value.slice(closingFence + fence.length).trim() !== ""
+    ) {
+      throw new Error("O manifesto foi retornado com um bloco Markdown incompleto.");
+    }
+    const language = value.slice(fence.length, firstLineEnd).trim().toLowerCase();
+    if (language && language !== "json") {
+      throw new Error("O bloco Markdown do manifesto precisa estar identificado como JSON.");
+    }
+    return value.slice(firstLineEnd + 1, closingFence).trim();
   }
 
   // Accept a JSON object surrounded by harmless prose, while scanning braces
