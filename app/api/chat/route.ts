@@ -381,8 +381,8 @@ async function callModel(
   const openAIKey = process.env.OPENAI_API_KEY?.trim();
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   const selectedKey = useGemini ? geminiKey : useOpenAI ? openAIKey : useOpenRouter ? openRouterKey : apiToken;
-  if (!selectedKey) throw new Error("A chave de API do provedor " + providerName + " não está configurada na Vercel.");
-  if (!useOpenRouter && !useOpenAI && !useGemini && !accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID não está configurado na Vercel.");
+  if (!selectedKey) throw new Error("A chave de API do provedor " + providerName + " não está configurada no servidor.");
+  if (!useOpenRouter && !useOpenAI && !useGemini && !accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID não está configurado no servidor.");
   const geminiModel = useGemini ? selectedModel.slice("gemini:".length) : "";
   const openRouterModel = selectedModel.startsWith("openrouter:") ? selectedModel.slice("openrouter:".length) : selectedModel;
   const endpoint = useGemini
@@ -457,7 +457,7 @@ async function callModel(
     }
     if (!upstream.ok) console.error(providerName + " API error:", upstream.status, detail);
     const errorMessage = upstream.status === 401
-      ? "Chave ou token " + providerName + " inválido. Confira as variáveis de ambiente na Vercel."
+      ? "Chave ou token " + providerName + " inválido. Confira as variáveis de ambiente no servidor."
       : upstream.status === 402
         ? "A conta do provedor " + providerName + " está sem créditos ou exige saldo. Confira o painel de faturamento."
         : upstream.status === 404
@@ -891,16 +891,16 @@ export async function POST(request: Request) {
     const allowedModels = ["openrouter:qwen/qwen3-coder-next", "openrouter:qwen/qwen-2.5-coder-32b-instruct", "cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free", "openai:gpt-5.6-luna", "gemini:gemini-3.8-flash"];
     const selectedModel = typeof body.model === "string" && allowedModels.includes(body.model) ? body.model : "openrouter:qwen/qwen3-coder-next";
     if (selectedModel === "cloudflare" && (!accountId || !apiToken)) {
-      return NextResponse.json({ error: "Para usar Cloudflare, configure CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN na Vercel." }, { status: 503 });
+      return NextResponse.json({ error: "Para usar Cloudflare, configure CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN no servidor." }, { status: 503 });
     }
     if (selectedModel === "gemini:gemini-3.8-flash" && !process.env.GEMINI_API_KEY?.trim()) {
-      return NextResponse.json({ error: "Para usar Gemini 3.8 Flash, configure GEMINI_API_KEY nas variáveis de ambiente da Vercel." }, { status: 503 });
+      return NextResponse.json({ error: "Para usar Gemini 3.8 Flash, configure GEMINI_API_KEY nas variáveis de ambiente do servidor." }, { status: 503 });
     }
     if (selectedModel === "openai:gpt-5.6-luna" && !process.env.OPENAI_API_KEY?.trim()) {
-      return NextResponse.json({ error: "Para usar GPT-5.6 Luna, configure OPENAI_API_KEY na Vercel. A cobrança é feita por tokens na conta da OpenAI." }, { status: 503 });
+      return NextResponse.json({ error: "Para usar GPT-5.6 Luna, configure OPENAI_API_KEY no servidor. A cobrança é feita por tokens na conta da OpenAI." }, { status: 503 });
     }
     if ((selectedModel.startsWith("openrouter:") || (selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:"))) && !process.env.OPENROUTER_API_KEY?.trim()) {
-      return NextResponse.json({ error: "Para usar modelos OpenRouter, cadastre OPENROUTER_API_KEY nas variáveis de ambiente da Vercel." }, { status: 503 });
+      return NextResponse.json({ error: "Para usar modelos OpenRouter, cadastre OPENROUTER_API_KEY nas variáveis de ambiente do servidor." }, { status: 503 });
     }
     if (!Array.isArray(body.messages) || body.messages.length === 0) {
       return NextResponse.json({ error: "Envie ao menos uma mensagem." }, { status: 400 });
