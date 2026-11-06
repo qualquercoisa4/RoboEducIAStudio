@@ -17,7 +17,7 @@ const MAX_MESSAGE_LENGTH = 40_000;
 const MAX_CONTEXT_CHARS = 28_000;
 const MAX_OUTPUT_TOKENS = 6_144;
 const MAX_DEEP_OUTPUT_TOKENS = 8_192;
-const MAX_REPAIR_TOKENS = 3_072;
+const MAX_REPAIR_TOKENS = 4_096;
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 const REVIEW_SYSTEM = `
@@ -398,7 +398,7 @@ async function callModel(
         : upstream.status === 404
           ? "O modelo selecionado não foi encontrado ou não está disponível no provedor " + providerName + "."
           : upstream.status === 429
-            ? "O provedor " + providerName + " limitou esta solicitação (HTTP 429). Pode ser limite de velocidade, cota do modelo gratuito ou saldo insuficiente; confira o painel do provedor."
+            ? "O provedor " + providerName + " limitou esta solicitação (HTTP 429). Pode ser limite de velocidade, cota do modelo gratuito ou saldo insuficiente. Detalhe do provedor: " + detail
             : upstream.status >= 500
               ? providerName + " está temporariamente indisponível (HTTP " + upstream.status + "). Tente novamente em instantes."
               : detail;
@@ -463,7 +463,7 @@ export async function POST(request: Request) {
       ? (codeTask ? 4_096 : 3_072)
       : mode === "deep" ? MAX_DEEP_OUTPUT_TOKENS
         : codeTask ? MAX_OUTPUT_TOKENS : 4_096;
-    const repairTokens = runtimeRepair ? 4_096 : mode === "deep" ? MAX_REPAIR_TOKENS : 1_536;
+    const repairTokens = runtimeRepair || codeTask ? MAX_REPAIR_TOKENS : mode === "deep" ? MAX_REPAIR_TOKENS : 1_536;
 
     return toEvents(async (send, signal) => {
       const status = (stage: string, detail: string) => send({ type: "status", stage, detail });
