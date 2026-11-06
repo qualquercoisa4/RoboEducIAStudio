@@ -307,3 +307,12 @@ html:has(.studio-shell),body:has(.studio-shell){height:100%;overflow:hidden}
 .model-picker select:focus{border-color:#9cc765}
 .model-picker small{grid-column:2;color:#72839b;font-size:9px;line-height:1.35}
 @media(max-width:720px){.model-picker{grid-template-columns:1fr;gap:5px}.model-picker small{grid-column:1}.model-picker select{width:100%}}
+
+
+/* Pesquisa web opcional: o usuário controla quando aceitar o custo adicional */
+.web-search-toggle{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0 3px 10px;padding:9px 11px;border:1px solid #2b3a51;border-radius:8px;background:#0d1728}
+.web-search-toggle label{display:flex;align-items:center;gap:8px;color:#dce8f7;font-size:11px;font-weight:800;white-space:nowrap}
+.web-search-toggle input{accent-color:#b9e66e;width:14px;height:14px}
+.web-search-toggle small{color:#8495ad;font-size:9px;line-height:1.4;text-align:right;max-width:65%}
+.web-search-toggle label:has(input:disabled){opacity:.5}
+@media(max-width:720px){.web-search-toggle{display:grid;gap:5px}.web-search-toggle small{text-align:left;max-width:none}}
