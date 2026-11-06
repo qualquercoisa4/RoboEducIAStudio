@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-type Choice = { id: string; title: string; description: string; art: string; tone: string };
+type Choice = { id: string; title: string; description: string; art: string; tone: string; image: string };
 type Answers = {
   style: string;
   objective: string;
@@ -14,46 +14,43 @@ type Answers = {
 };
 
 const styles: Choice[] = [
-  { id: "Minecraft", title: "Minecraft", description: "Blocos, construção e sobrevivência", art: "🧱", tone: "mint" },
-  { id: "Roblox", title: "Roblox", description: "Obbys, avatares e mundos 3D", art: "🧍", tone: "blue" },
-  { id: "Fortnite", title: "Fortnite", description: "Ação, arenas e desafios", art: "🎯", tone: "purple" },
-  { id: "Sonic", title: "Sonic", description: "Velocidade, saltos e fases", art: "💨", tone: "yellow" },
-  { id: "Corrida", title: "Corrida", description: "Veículos, pistas e desafios", art: "🏎️", tone: "orange" },
-  { id: "Meu próprio estilo", title: "Inventar um estilo", description: "Criar algo totalmente diferente", art: "✨", tone: "pink" },
+  { id: "Minecraft", title: "Minecraft", description: "Blocos, construção e sobrevivência", art: "🧱", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "mint" },
+  { id: "Roblox", title: "Roblox", description: "Obbys, avatares e mundos 3D", art: "🧍", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "blue" },
+  { id: "Fortnite", title: "Fortnite", description: "Ação, arenas e desafios", art: "🎯", image: "https://i.insider.com/5a9ee5a25cc41021008b45ce?auto=webp&format=jpeg&width=800", tone: "purple" },
+  { id: "Sonic", title: "Sonic", description: "Velocidade, saltos e fases", art: "💨", image: "https://i.guim.co.uk/img/media/180629c53bbca46b14ce0373a389a742d208d7ea/35_0_1067_640/master/1067.jpg?auto=format&fit=max&quality=85&s=ceb8c66b7efdc01ac1b7c1c6bb8f2453&width=700", tone: "yellow" },
+  { id: "Corrida", title: "Corrida", description: "Veículos, pistas e desafios", art: "🏎️", image: "https://imag.malavida.com/mvimgbig/download-fs/forza-horizon-5-38804-8.jpg", tone: "orange" },
+  { id: "Meu próprio estilo", title: "Inventar um estilo", description: "Criar algo totalmente diferente", art: "✨", image: "https://media.rawg.io/media/screenshots/3a8/3a86566137cc587eec4b2321c451c110.jpg", tone: "pink" },
 ];
 const objectives: Choice[] = [
-  { id: "Construir robôs", title: "Construir robôs", description: "Montar máquinas e testar invenções", art: "🤖", tone: "blue" },
-  { id: "Construir cidades", title: "Construir cidades", description: "Criar casas, ruas e cidades inteligentes", art: "🏙️", tone: "purple" },
-  { id: "Aprender robótica", title: "Aprender robótica", description: "Usar sensores, motores e programação", art: "⚙️", tone: "mint" },
-  { id: "Explorar e sobreviver", title: "Explorar e sobreviver", description: "Descobrir lugares e superar perigos", art: "🧭", tone: "orange" },
-  { id: "Resolver desafios", title: "Resolver desafios", description: "Quebra-cabeças, lógica e criatividade", art: "🧩", tone: "yellow" },
-  { id: "Vencer competições", title: "Vencer competições", description: "Disputar provas e bater recordes", art: "🏆", tone: "pink" },
+  { id: "Construir robôs", title: "Construir robôs", description: "Montar máquinas e testar invenções", art: "🤖", image: "https://images.sftcdn.net/images/t_app-cover-l%2Cf_auto/p/02a4872f-2a13-451c-905a-26f9c9206f8f/1043206255/coding-robo-screenshot.png", tone: "blue" },
+  { id: "Construir cidades", title: "Construir cidades", description: "Criar casas, ruas e cidades inteligentes", art: "🏙️", image: "https://images.cgames.de/images/gsgp/287/highrise-city_6141338.jpg", tone: "purple" },
+  { id: "Aprender robótica", title: "Aprender robótica", description: "Usar sensores, motores e programação", art: "⚙️", image: "https://images.sftcdn.net/images/t_app-cover-l%2Cf_auto/p/02a4872f-2a13-451c-905a-26f9c9206f8f/1043206255/coding-robo-screenshot.png", tone: "mint" },
+  { id: "Explorar e sobreviver", title: "Explorar e sobreviver", description: "Descobrir lugares e superar perigos", art: "🧭", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "orange" },
+  { id: "Resolver desafios", title: "Resolver desafios", description: "Quebra-cabeças, lógica e criatividade", art: "🧩", image: "https://media.rawg.io/media/screenshots/3a8/3a86566137cc587eec4b2321c451c110.jpg", tone: "yellow" },
+  { id: "Vencer competições", title: "Vencer competições", description: "Disputar provas e bater recordes", art: "🏆", image: "https://imag.malavida.com/mvimgbig/download-fs/forza-horizon-5-38804-8.jpg", tone: "pink" },
 ];
 const cameras: Choice[] = [
-  { id: "Primeira pessoa", title: "Primeira pessoa", description: "Ver pelos olhos do personagem", art: "👁️", tone: "blue" },
-  { id: "Terceira pessoa", title: "Terceira pessoa", description: "Ver o personagem por trás", art: "🧍", tone: "mint" },
-  { id: "Visão de cima", title: "Visão de cima", description: "Ver o mapa do alto", art: "🗺️", tone: "yellow" },
-  { id: "Lateral 2D", title: "Lateral 2D", description: "Ver o jogo de lado", art: "🎮", tone: "purple" },
+  { id: "Primeira pessoa", title: "Primeira pessoa", description: "Ver pelos olhos do personagem", art: "👁️", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "blue" },
+  { id: "Terceira pessoa", title: "Terceira pessoa", description: "Ver o personagem por trás", art: "🧍", image: "https://fiverr-res.cloudinary.com/images/q_auto%2Cf_auto/gigs/462484368/original/95f90abe92342e3078a40064b12dab30a847827b/record-roblox-parkour-gameplay.png", tone: "mint" },
+  { id: "Visão de cima", title: "Visão de cima", description: "Ver o mapa do alto", art: "🗺️", image: "https://images.cgames.de/images/gsgp/287/highrise-city_6141338.jpg", tone: "yellow" },
+  { id: "Lateral 2D", title: "Lateral 2D", description: "Ver o jogo de lado", art: "🎮", image: "https://i.guim.co.uk/img/media/180629c53bbca46b14ce0373a389a742d208d7ea/35_0_1067_640/master/1067.jpg?auto=format&fit=max&quality=85&s=ceb8c66b7efdc01ac1b7c1c6bb8f2453&width=700", tone: "purple" },
 ];
 const gameplays: Choice[] = [
   { id: "Construir e criar", title: "Construir e criar", description: "Montar coisas e inventar", art: "🧱", tone: "mint" },
   { id: "Explorar mapas", title: "Explorar mapas", description: "Descobrir lugares novos", art: "🧭", tone: "blue" },
-  { id: "Coletar itens", title: "Coletar itens", description: "Juntar moedas e objetos", art: "💎", tone: "purple" },
-  { id: "Enfrentar inimigos", title: "Enfrentar inimigos", description: "Desviar e lutar", art: "🐛", tone: "orange" },
+  { id: "Coletar itens", title: "Coletar itens", description: "Juntar moedas e objetos", art: "💎", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "purple" },
+  { id: "Enfrentar inimigos", title: "Enfrentar inimigos", description: "Desviar e lutar", art: "🐛", image: "https://i.insider.com/5a9ee5a25cc41021008b45ce?auto=webp&format=jpeg&width=800", tone: "orange" },
   { id: "Programar mecanismos", title: "Programar mecanismos", description: "Controlar máquinas e robôs", art: "⚙️", tone: "yellow" },
   { id: "Resolver puzzles", title: "Resolver puzzles", description: "Encontrar soluções", art: "🧩", tone: "pink" },
-  { id: "Correr e competir", title: "Correr e competir", description: "Chegar em primeiro lugar", art: "🏁", tone: "orange" },
+  { id: "Correr e competir", title: "Correr e competir", description: "Chegar em primeiro lugar", art: "🏁", image: "https://imag.malavida.com/mvimgbig/download-fs/forza-horizon-5-38804-8.jpg", tone: "orange" },
   { id: "Jogar em fases", title: "Jogar em fases", description: "Passar por várias etapas", art: "🎯", tone: "blue" },
 ];
 const difficulties: Choice[] = [
-  { id: "Fácil", title: "Fácil", description: "Para começar", art: "🐣", tone: "mint" },
-  { id: "Médio", title: "Médio", description: "Um desafio equilibrado", art: "🚀", tone: "blue" },
-  { id: "Desafiador", title: "Desafiador", description: "Para quem gosta de desafio", art: "🔥", tone: "orange" },
+  { id: "Fácil", title: "Fácil", description: "Para começar", art: "🐣", image: "https://images.sftcdn.net/images/t_app-cover-l%2Cf_auto/p/02a4872f-2a13-451c-905a-26f9c9206f8f/1043206255/coding-robo-screenshot.png", tone: "mint" },
+  { id: "Médio", title: "Médio", description: "Um desafio equilibrado", art: "🚀", image: "https://pic.clubic.com/183367e01697572/1414x809/smart/minecraft.png", tone: "blue" },
+  { id: "Desafiador", title: "Desafiador", description: "Para quem gosta de desafio", art: "🔥", image: "https://i.insider.com/5a9ee5a25cc41021008b45ce?auto=webp&format=jpeg&width=800", tone: "orange" },
 ];
-function emojiImage(emoji: string) {
-  const code = Array.from(emoji).map(char => char.codePointAt(0)!.toString(16)).filter(code => code !== "fe0f").join("-");
-  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${code}.svg`;
-}
+function emojiImage(emoji: string) { return emoji; }
 const initial: Answers = { style: "", objective: "", camera: "Terceira pessoa", gameplay: ["Explorar mapas", "Construir e criar"], difficulty: "Médio", extra: "", name: "" };
 const steps = ["Estilo", "Objetivo", "Como jogar", "Detalhes", "Pronto!"];
 
@@ -196,7 +193,7 @@ export default function Home() {
           <div className="wizard-question"><span>01</span><div><h2>Qual estilo vai ter o seu jogo?</h2><p>Escolha o tipo de aventura que mais combina com você.</p></div></div>
           <div className="choice-grid style-grid">
             {styles.map((item, index) => <button key={item.id} className={`choice-card ${item.tone} ${answers.style === item.id ? "selected" : ""}`} onClick={() => update("style", item.id)}>
-              <span className="choice-art"><img src={emojiImage(item.art)} alt="" loading="lazy" /><b>{index === 0 ? "▦ ▦ ▦" : index === 1 ? "◆ ◇ ◆" : index === 2 ? "✦ ✧ ✦" : index === 3 ? "➜ ➜" : index === 4 ? "◉ ◉" : "✧ ✦"}</b></span>
+              <span className="choice-art screenshot-art"><img src={item.image} alt={`Imagem de gameplay: ${item.title}`} loading="lazy" /><b>{index === 0 ? "▦ ▦ ▦" : index === 1 ? "◆ ◇ ◆" : index === 2 ? "✦ ✧ ✦" : index === 3 ? "➜ ➜" : index === 4 ? "◉ ◉" : "✧ ✦"}</b></span>
               <span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
             </button>)}
           </div>
@@ -206,14 +203,14 @@ export default function Home() {
           <div className="wizard-question"><span>02</span><div><h2>O que você quer fazer no jogo?</h2><p>Qual será a missão mais importante?</p></div></div>
           <div className="choice-grid objective-grid">
             {objectives.map(item => <button key={item.id} className={`choice-card objective-card ${item.tone} ${answers.objective === item.id ? "selected" : ""}`} onClick={() => update("objective", item.id)}>
-              <span className="objective-art"><img src={emojiImage(item.art)} alt="" loading="lazy" /></span><span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
+              <span className="objective-art screenshot-art"><img src={item.image} alt={`Imagem de gameplay: ${item.title}`} loading="lazy" /></span><span className="choice-copy"><strong>{item.title}</strong><small>{item.description}</small></span><span className="choice-check">✓</span>
             </button>)}
           </div>
         </div>}
 
         {step === 2 && <div className="wizard-panel">
           <div className="wizard-question"><span>03</span><div><h2>Como será a aventura?</h2><p>Escolha a câmera e o que o jogador poderá fazer.</p></div></div>
-          <div className="field-block"><h3>Como vamos enxergar o jogo?</h3><div className="visual-option-grid camera-grid">{cameras.map(item => <button key={item.id} className={`visual-option ${answers.camera === item.id ? "active" : ""}`} onClick={() => update("camera", item.id)}><img src={emojiImage(item.art)} alt="" loading="lazy" /><strong>{item.title}</strong><small>{item.description}</small></button>)}</div></div>
+          <div className="field-block"><h3>Como vamos enxergar o jogo?</h3><div className="visual-option-grid camera-grid">{cameras.map(item => <button key={item.id} className={`visual-option ${answers.camera === item.id ? "active" : ""}`} onClick={() => update("camera", item.id)}><img src={item.image} alt={`Imagem de gameplay: ${item.title}`} loading="lazy" /><strong>{item.title}</strong><small>{item.description}</small></button>)}</div></div>
           <div className="field-block"><h3>O que o jogador poderá fazer?</h3><p className="field-hint">Pode escolher mais de uma opção.</p><div className="visual-option-grid gameplay-grid">{gameplays.map(item => <button key={item.id} className={`visual-option ${answers.gameplay.includes(item.id) ? "active" : ""}`} onClick={() => toggleGameplay(item.id)}><img src={emojiImage(item.art)} alt="" loading="lazy" /><strong>{item.title}</strong><small>{item.description}</small><span className="visual-option-check">{answers.gameplay.includes(item.id) ? "✓" : "+"}</span></button>)}</div></div>
         </div>}
 
