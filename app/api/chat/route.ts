@@ -873,7 +873,7 @@ export async function POST(request: Request) {
       let activeModel = selectedModel;
       let answer = "";
       try {
-        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, Boolean(body.webSearch), chunk => send({ type: "token", response: chunk }), body.structuredOutput === true);
+        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, Boolean(body.webSearch), chunk => send({ type: "token", response: chunk }));
       } catch (primaryError) {
         if (signal.aborted) throw primaryError;
         const message = primaryError instanceof Error ? primaryError.message : String(primaryError);
@@ -899,7 +899,7 @@ export async function POST(request: Request) {
           try {
             activeModel = fallbackModel;
             answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal,
-              fallbackModel === "cloudflare" ? 30_000 : 30_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }), body.structuredOutput === true && fallbackModel !== "cloudflare");
+              fallbackModel === "cloudflare" ? 30_000 : 30_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }));
             if (answer.trim()) {
               status("fallback-success", "Resposta recuperada automaticamente por " + fallbackName + ".");
               break;

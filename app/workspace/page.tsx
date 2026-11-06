@@ -142,13 +142,18 @@ export default function WorkspacePage(){
    }
    buffer+=decoder.decode();
    if(buffer.trim())parseEvent(buffer);
-   if(!doneReceived||!plan||!applySignal)throw new Error("O fluxo terminou antes da autorização final. Nenhum arquivo foi aplicado.");
+   const completedApplySignal = applySignal as {
+    summary:string;
+    operations:WorkspaceOperation[];
+    fileLengths:Record<string,number>;
+   } | null;
+   if(!doneReceived||!plan||!completedApplySignal)throw new Error("O fluxo terminou antes da autorização final. Nenhum arquivo foi aplicado.");
 
    // Compare the editor against the exact snapshot used by the agent.
    const current=projectRef.current;
    const currentMap=new Map(current.files.map(file=>[file.path,file]));
    const snapshotMap=new Map(snapshot.map(file=>[file.path,file]));
-   for(const operation of applySignal.operations){
+   for(const operation of completedApplySignal.operations){
     const existing=currentMap.get(operation.path);
     const original=snapshotMap.get(operation.path);
     if(operation.action==="create"&&existing)throw new Error("O arquivo "+operation.path+" foi criado localmente durante a geração. A aplicação foi cancelada.");
@@ -158,21 +163,21 @@ export default function WorkspacePage(){
    }
 
    const nextMap=new Map(current.files.map(file=>[file.path,file]));
-   for(const operation of applySignal.operations){
+   for(const operation of completedApplySignal.operations){
     if(operation.action==="delete"){nextMap.delete(operation.path);continue}
     const content=pendingFiles.get(operation.path);
-    if(typeof content!=="string"||content.length!==applySignal.fileLengths[operation.path])throw new Error("Conteúdo final ausente para "+operation.path+".");
+    if(typeof content!=="string"||content.length!==completedApplySignal.fileLengths[operation.path])throw new Error("Conteúdo final ausente para "+operation.path+".");
     nextMap.set(operation.path,{path:operation.path,content,updatedAt:Date.now()});
    }
    const nextProject={...current,files:[...nextMap.values()].sort((a,b)=>a.path.localeCompare(b.path))};
    setProject(nextProject);
    projectRef.current=nextProject;
-   const firstChanged=applySignal.operations.find(operation=>operation.action!=="delete");
+   const firstChanged=completedApplySignal.operations.find(operation=>operation.action!=="delete");
    if(firstChanged){setSelectedPath(firstChanged.path);setTab("preview")}
-   else if(applySignal.operations.length){setSelectedPath(nextProject.files[0]?.path||"");setTab("code")}
+   else if(completedApplySignal.operations.length){setSelectedPath(nextProject.files[0]?.path||"");setTab("code")}
    setHistory(old=>[...old,{role:"assistant",text:applySignal!.summary}]);
    setPrompt("");
-   setStatus(applySignal.summary+" · "+applySignal.operations.filter(operation=>operation.action!=="delete").length+" arquivo(s) gerado(s), "+applySignal.operations.filter(operation=>operation.action==="delete").length+" excluído(s).");
+   setStatus(completedApplySignal.summary+" · "+completedApplySignal.operations.filter(operation=>operation.action!=="delete").length+" arquivo(s) gerado(s), "+completedApplySignal.operations.filter(operation=>operation.action==="delete").length+" excluído(s).");
   }catch(error){
    const message=error instanceof Error?error.message:"Falha ao aplicar alterações.";
    setStatus(message);
