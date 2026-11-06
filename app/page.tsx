@@ -73,8 +73,8 @@ export default function Home() {
      skip_prompt:true,skip_special_tokens:true,
      callback_function:(token:string)=>{if(!cancelRef.current)append(token);}
     });
-    await engineRef.current([{role:"system",content:SYSTEM},...base.slice(-10)],{
-     max_new_tokens:700,do_sample:false,streamer,stopping_criteria:interruptRef.current
+    await engineRef.current([{role:"system",content:SYSTEM},...base.slice(-4)],{
+     max_new_tokens:220,do_sample:false,streamer,stopping_criteria:interruptRef.current
     });
    }else{
     const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json","Accept":"text/event-stream"},body:JSON.stringify({messages:base,systemInstruction:SYSTEM})});
