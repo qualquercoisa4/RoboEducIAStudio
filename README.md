@@ -1,21 +1,24 @@
 # RoboEduc IA Studio
 
-Aplicação educacional com duas áreas: chatbot RoboEduc IA na página inicial e Game Studio em `/studio`.
+Aplicação educacional com chatbot RoboEduc IA na página inicial e Game Studio em `/studio`.
 
-## Chatbot
+## IA local (sem chave de API)
 
-O chatbot usa Cloudflare Workers AI com o modelo `@cf/qwen/qwen3-30b-a3b-fp8`, com transmissão incremental (Server-Sent Events). A chave fica no servidor e não é enviada ao navegador.
+O chatbot usa WebLLM para executar um modelo Qwen diretamente no navegador via WebGPU. Não exige conta de provedor, token de API ou servidor de inferência. O modelo é baixado no primeiro uso e armazenado em cache pelo navegador.
 
-Configure estas variáveis no ambiente de execução (por exemplo, Vercel):
+- Dispositivos com memória reportada até 4 GB: Qwen2 0.5B quantizado.
+- Outros dispositivos: Qwen2 1.5B quantizado.
+- É necessário navegador compatível com WebGPU (Chrome/Edge atualizado em hardware compatível).
+- A primeira inicialização pode baixar centenas de MB ou mais. A geração usa GPU local; velocidade e qualidade variam conforme o dispositivo.
+- As conversas ficam no armazenamento local do navegador. Com o modo local ativo, as mensagens não são enviadas a um serviço de inferência.
 
-- `CLOUDFLARE_ACCOUNT_ID`
-- `CLOUDFLARE_API_TOKEN` (token com permissão para executar Workers AI)
+## IA Cloudflare opcional
 
-Sem essas credenciais, a interface abre, mas o envio de mensagens retorna um aviso de configuração.
+Se `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN` estiverem configurados na Vercel, a rota de servidor continua disponível como alternativa de modelo maior.
 
 ## Game Studio
 
-Acesse `/studio` para usar o criador de jogos existente. O código e o componente de sobrevivência foram preservados.
+Acesse `/studio` para usar o criador de jogos existente.
 
 ## Desenvolvimento
 
@@ -23,9 +26,3 @@ Acesse `/studio` para usar o criador de jogos existente. O código e o component
 npm install
 npm run dev
 ```
-
-## Privacidade e limites
-
-- O histórico do chatbot é salvo no armazenamento local do navegador.
-- As mensagens enviadas ao chatbot são processadas pela Cloudflare Workers AI.
-- Há um limite básico por instância de 20 requisições por minuto por IP. Para produção com tráfego público, recomenda-se adicionar rate limiting compartilhado e autenticação.
