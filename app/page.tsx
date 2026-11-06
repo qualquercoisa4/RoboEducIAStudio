@@ -48,7 +48,6 @@ export default function Home() {
         const parsed = JSON.parse(raw) as Conversation[];
         if (Array.isArray(parsed)) {
           // Restore client-only conversation history after mount.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setItems(parsed);
           // eslint-disable-next-line react-hooks/set-state-in-effect
           setActiveId(parsed[0]?.id ?? "");
