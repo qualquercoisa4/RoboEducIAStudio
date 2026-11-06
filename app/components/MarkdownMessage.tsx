@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, ReactNode, useState } from "react";
+import { Fragment, useState, type ReactNode, type ElementType } from "react";
 
 type Token = { type: "text" | "bold" | "italic" | "strike" | "code" | "link"; value: string; href?: string };
 
@@ -90,7 +90,7 @@ export default function MarkdownMessage({ content }: { content: string }) {
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
     if (heading) {
       const level = heading[1].length;
-      const Tag = (`h${level}`) as keyof JSX.IntrinsicElements;
+      const Tag = (`h${level}`) as ElementType;
       blocks.push(<Tag className={`md-heading md-h${level}`} key={key++}><Inline text={heading[2]} /></Tag>);
       i++;
       continue;
