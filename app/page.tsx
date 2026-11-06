@@ -27,6 +27,8 @@ export default function Home() {
   const [sidebar, setSidebar] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<WorkMode>("complete");
+  const [selectedModel, setSelectedModel] = useState("cloudflare");
+  const [openRouterReady, setOpenRouterReady] = useState(false);
   const [processSteps, setProcessSteps] = useState<string[]>([]);
   const bottom = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
@@ -49,7 +51,7 @@ export default function Home() {
     }
     fetch("/api/status")
       .then(response => response.json())
-      .then(data => setCloudReady(Boolean(data.configured)))
+      .then(data => { setCloudReady(Boolean(data.configured)); setOpenRouterReady(Boolean(data.openrouterConfigured)); })
       .catch(() => setCloudReady(false));
   }, []);
 
@@ -154,7 +156,7 @@ export default function Home() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
-        body: JSON.stringify({ messages: base, systemInstruction: SYSTEM, mode }),
+        body: JSON.stringify({ messages: base, systemInstruction: SYSTEM, mode, model: selectedModel }),
         signal: controller.signal
       });
 
@@ -298,6 +300,17 @@ export default function Home() {
             <span>{cloudReady ? "CONECTADA" : "AGUARDANDO"}</span>
           </div>
           {error && <div className="error-banner">{error}<button onClick={() => setError("")}>Fechar</button></div>}
+          <div className="model-picker" aria-label="Modelo de inteligência artificial">
+            <label htmlFor="model-choice">MODELO</label>
+            <select id="model-choice" value={selectedModel} onChange={event => setSelectedModel(event.target.value)} disabled={loading}>
+              <option value="cloudflare">Qwen3 30B · Cloudflare</option>
+              <option value="recursive/flint-v1.0:free" disabled={!openRouterReady}>Flint · OpenRouter grátis</option>
+              <option value="cohere/north-mini-code:free" disabled={!openRouterReady}>North Mini Code · OpenRouter grátis</option>
+              <option value="nvidia/nemotron-3-ultra-550b-a55b:free" disabled={!openRouterReady}>Nemotron 3 Ultra · OpenRouter grátis</option>
+              <option value="google/gemma-4-31b-it:free" disabled={!openRouterReady}>Gemma 4 31B · OpenRouter grátis</option>
+            </select>
+            <small>{selectedModel === "cloudflare" ? "Modelo atual" : openRouterReady ? "Modelo gratuito (sujeito a limites)" : "Configure OPENROUTER_API_KEY na Vercel para liberar os modelos"}</small>
+          </div>
           <div className="mode-selector" aria-label="Nível de processamento">
             <span>PROCESSAMENTO</span>
             <div>
