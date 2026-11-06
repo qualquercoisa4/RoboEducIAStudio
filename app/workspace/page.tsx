@@ -1,10 +1,11 @@
 "use client";
 
 import "./workspace.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type ProjectFile = { path: string; content: string; updatedAt: number };
 type Project = { name: string; files: ProjectFile[] };
+type WorkspaceOperation = { path: string; action: "create" | "update" | "delete"; reason: string };
 type Tab = "chat" | "code" | "preview";
 const STORAGE_KEY = "roboeduc-workspace-v1";
 const starterFiles: ProjectFile[] = [
@@ -12,17 +13,6 @@ const starterFiles: ProjectFile[] = [
  {path:"src/style.css",content:"body{margin:0;min-height:100vh;font-family:system-ui,sans-serif;background:#f4f7fb;color:#343044}main{max-width:900px;margin:auto;padding:32px}h1{color:#4598d1}",updatedAt:Date.now()},
  {path:"src/main.js",content:"const app=document.querySelector('#app');\nconsole.log('Projeto iniciado',app);",updatedAt:Date.now()}
 ];
-function parsePatch(raw:string){
- const cleaned=raw.replace(/```(?:json)?/gi,"").replace(/```/g,"").trim();
- const start=cleaned.indexOf("{"),end=cleaned.lastIndexOf("}");
- if(start<0||end<=start)throw new Error("A IA não retornou um JSON válido. Tente novamente.");
- const data=JSON.parse(cleaned.slice(start,end+1));
- const source=Array.isArray(data.changes)?data.changes:(Array.isArray(data.files)?data.files:[]);
- const changes=source.filter((item:any)=>item&&typeof item.path==="string"&&typeof item.content==="string");
- const deletes=Array.isArray(data.deletes)?data.deletes.filter((item:unknown)=>typeof item==="string"):[];
- if(!changes.length&&!deletes.length)throw new Error(typeof data.summary==="string"?data.summary:"A IA não retornou alterações aplicáveis.");
- return {summary:typeof data.summary==="string"?data.summary:"Alterações aplicadas.",changes,deletes};
-}
 function makePreview(html:string,files:ProjectFile[]){
  let result=html;
  for(const file of files){
@@ -33,6 +23,8 @@ function makePreview(html:string,files:ProjectFile[]){
 }
 export default function WorkspacePage(){
  const [project,setProject]=useState<Project>({name:"Meu projeto",files:starterFiles});
+ const projectRef=useRef(project);
+ projectRef.current=project;
  const [selectedPath,setSelectedPath]=useState("index.html");
  const [prompt,setPrompt]=useState("");
  const [busy,setBusy]=useState(false);
@@ -52,30 +44,146 @@ export default function WorkspacePage(){
  function removeFile(){if(!selected||!window.confirm("Excluir "+selected.path+"?"))return;const next=files.filter(f=>f.path!==selected.path);setProject(old=>({...old,files:next}));setSelectedPath(next[0]?.path||"")}
  function exportFiles(){const text=files.map(f=>"===== "+f.path+" =====\n"+f.content).join("\n\n");const url=URL.createObjectURL(new Blob([text],{type:"text/plain"}));const a=document.createElement("a");a.href=url;a.download="projeto-roboeduc.txt";a.click();URL.revokeObjectURL(url)}
  async function askAI(){
-  const request=prompt.trim();if(!request||busy)return;setBusy(true);setStatus("Analisando os arquivos do projeto...");setHistory(old=>[...old,{role:"user",text:request}]);
+  const request=prompt.trim();
+  if(!request||busy)return;
+  const snapshot=project.files.map(file=>({path:file.path,content:file.content}));
+  setBusy(true);
+  setStatus("Analisando os arquivos do projeto...");
+  setHistory(old=>[...old,{role:"user",text:request}]);
   try{
-   const snapshot=files.map(f=>({path:f.path,content:f.content}));
-   const systemInstruction="Você é um agente de engenharia de software. Modifique o projeto existente de forma incremental. Preserve tudo que não precisa mudar. Não recrie o projeto inteiro. Retorne exclusivamente JSON válido neste formato: {\"summary\":\"resumo\",\"changes\":[{\"path\":\"arquivo.ext\",\"content\":\"conteúdo COMPLETO final\"}],\"deletes\":[]} . Inclua apenas arquivos novos ou alterados. deletes pode ser [] se não houver exclusões. Não retorne diffs, placeholders ou texto fora do JSON. Projeto: "+project.name;
-   const messages=[...history.slice(-8).map(item=>({role:item.role==="assistant"?"assistant" as const:"user" as const,content:item.text})),{role:"user" as const,content:"PEDIDO ATUAL:\n"+request+"\n\nESTADO ATUAL DOS ARQUIVOS (fonte de verdade):\n"+JSON.stringify(snapshot)}];
-   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json",Accept:"text/event-stream"},body:JSON.stringify({messages,systemInstruction,mode,model,webSearch:false,structuredOutput:true})});
-   if(!response.ok){const error=await response.json().catch(()=>null);throw new Error(error?.error||"Falha HTTP "+response.status)}
-   if(!response.body)throw new Error("O servidor não retornou o fluxo.");
-   const reader=response.body.getReader(),decoder=new TextDecoder();let buffer="",answer="";
-   const parseEvent=(event:string)=>{for(const line of event.split(/\r?\n/)){if(!line.startsWith("data:"))continue;let data:any;try{data=JSON.parse(line.slice(5).trim())}catch{continue}if(data.type==="token")answer+=data.response||"";if(data.type==="reset")answer="";if(data.type==="error")throw new Error(data.error||"Falha na geração.");if(data.type==="status"&&data.detail)setStatus(data.detail)}};
-   while(true){const part=await reader.read();if(part.done)break;buffer+=decoder.decode(part.value,{stream:true});const events=buffer.split(/\r?\n\r?\n/);buffer=events.pop()||"";for(const event of events)parseEvent(event)}
-   buffer+=decoder.decode();if(buffer.trim())parseEvent(buffer);
-   if(!answer.trim())throw new Error("A IA encerrou sem retornar alterações.");
-   const patch=parsePatch(answer);
-   setProject(old=>{const map=new Map(old.files.map(f=>[f.path,f]));for(const path of patch.deletes)map.delete(path);for(const item of patch.changes){const path=item.path.trim().replace(/^\/+/, "").replace(/\\/g,"/");if(!path||path.split("/").includes(".."))continue;map.set(path,{path,content:item.content,updatedAt:Date.now()})}return {...old,files:[...map.values()].sort((a,b)=>a.path.localeCompare(b.path))}});
-   if(patch.changes.length){setSelectedPath(patch.changes[0].path);setTab("preview")}
-   setHistory(old=>[...old,{role:"assistant",text:patch.summary}]);setPrompt("");setStatus(patch.summary+" · "+patch.changes.length+" arquivo(s) alterado(s).");
-  }catch(error){const message=error instanceof Error?error.message:"Falha ao aplicar alterações.";setStatus(message);setHistory(old=>[...old,{role:"assistant",text:"Não consegui aplicar as alterações: "+message}])}finally{setBusy(false)}
+   const messages=[
+    ...history.slice(-8).map(item=>({role:item.role==="assistant"?"assistant" as const:"user" as const,content:item.text})),
+    {role:"user" as const,content:request}
+   ];
+   const systemInstruction="Você é um agente de engenharia de software do RoboEduc AI Studio. Modifique o projeto existente de forma incremental, preserve tudo que não precisa mudar, respeite os requisitos e não invente testes. O servidor planejará e solicitará cada arquivo separadamente.";
+   const response=await fetch("/api/chat",{
+    method:"POST",
+    headers:{"Content-Type":"application/json",Accept:"text/event-stream"},
+    body:JSON.stringify({messages,projectFiles:snapshot,systemInstruction,mode,model,webSearch:false,structuredOutput:true})
+   });
+   if(!response.ok){
+    const error=await response.json().catch(()=>null);
+    throw new Error(error?.error||"Falha HTTP "+response.status);
+   }
+   if(!response.body)throw new Error("O servidor não retornou o fluxo SSE.");
+   const reader=response.body.getReader(),decoder=new TextDecoder();
+   let buffer="",plan:{summary:string;operations:WorkspaceOperation[]}|null=null;
+   let applySignal:{summary:string;operations:WorkspaceOperation[];fileLengths:Record<string,number>}|null=null;
+   let doneReceived=false;
+   const pendingFiles=new Map<string,string>();
+   const completedFiles=new Map<string,number>();
+   const plannedFile=(path:string)=>plan?.operations.some(operation=>operation.path===path&&operation.action!=="delete")??false;
+
+   const parseEvent=(eventText:string)=>{
+    const dataLines=eventText.split(/\r?\n/).filter(line=>line.startsWith("data:"));
+    if(!dataLines.length)return;
+    const payload=dataLines.map(line=>line.slice(5).replace(/^ /,"")).join("\n");
+    let event:any;
+    try{event=JSON.parse(payload)}
+    catch{throw new Error("O fluxo SSE contém um evento inválido ou truncado. Nenhuma alteração foi aplicada.")}
+    if(event.type==="status"&&typeof event.detail==="string"){setStatus(event.detail);return}
+    if(event.type==="plan"){
+     if(plan)throw new Error("O servidor enviou mais de um manifesto para a mesma operação.");
+     if(typeof event.summary!=="string"||!Array.isArray(event.operations))throw new Error("Manifesto recebido em formato inválido.");
+     plan={summary:event.summary,operations:event.operations as WorkspaceOperation[]};
+     return;
+    }
+    if(event.type==="file_start"){
+     if(!plan||typeof event.path!=="string"||!plannedFile(event.path))throw new Error("O servidor iniciou um arquivo fora do manifesto.");
+     pendingFiles.set(event.path,"");
+     completedFiles.delete(event.path);
+     return;
+    }
+    if(event.type==="file_reset"){
+     if(typeof event.path!=="string"||!plannedFile(event.path))throw new Error("O servidor tentou reiniciar um arquivo fora do manifesto.");
+     pendingFiles.set(event.path,"");
+     completedFiles.delete(event.path);
+     return;
+    }
+    if(event.type==="file_chunk"){
+     if(typeof event.path!=="string"||typeof event.chunk!=="string"||!pendingFiles.has(event.path)||!plannedFile(event.path))throw new Error("O fluxo contém conteúdo de arquivo sem início válido.");
+     pendingFiles.set(event.path,(pendingFiles.get(event.path)||"")+event.chunk);
+     return;
+    }
+    if(event.type==="file_complete"){
+     const content=pendingFiles.get(event.path);
+     if(typeof event.path!=="string"||typeof content!=="string"||!plannedFile(event.path)||!Number.isInteger(event.contentLength)||content.length!==event.contentLength){
+      throw new Error("O arquivo recebido está incompleto ou diverge do tamanho confirmado pelo servidor: "+String(event.path)+".");
+     }
+     completedFiles.set(event.path,event.contentLength);
+     return;
+    }
+    if(event.type==="apply"){
+     if(!plan||applySignal)throw new Error("A autorização de aplicação está ausente ou duplicada.");
+     if(typeof event.summary!=="string"||!Array.isArray(event.operations)||!event.fileLengths||typeof event.fileLengths!=="object")throw new Error("A autorização de aplicação está malformada.");
+     if(JSON.stringify(event.operations)!==JSON.stringify(plan.operations))throw new Error("O conjunto de operações mudou durante a geração.");
+     for(const operation of plan.operations){
+      if(operation.action==="delete")continue;
+      const expected=event.fileLengths[operation.path];
+      if(!Number.isInteger(expected)||!completedFiles.has(operation.path)||completedFiles.get(operation.path)!==expected){
+       throw new Error("O arquivo "+operation.path+" não foi integralmente recebido e confirmado.");
+      }
+     }
+     if(Object.keys(event.fileLengths).length!==plan.operations.filter(operation=>operation.action!=="delete").length)throw new Error("A autorização contém arquivos ausentes ou inesperados.");
+     applySignal={summary:event.summary,operations:event.operations,fileLengths:event.fileLengths};
+     return;
+    }
+    if(event.type==="error")throw new Error(event.error||"Falha na geração.");
+    if(event.type==="done"){doneReceived=true;return}
+   };
+
+   while(true){
+    const part=await reader.read();
+    if(part.done)break;
+    buffer+=decoder.decode(part.value,{stream:true});
+    const events=buffer.split(/\r?\n\r?\n/);
+    buffer=events.pop()||"";
+    for(const eventText of events)parseEvent(eventText);
+   }
+   buffer+=decoder.decode();
+   if(buffer.trim())parseEvent(buffer);
+   if(!doneReceived||!plan||!applySignal)throw new Error("O fluxo terminou antes da autorização final. Nenhum arquivo foi aplicado.");
+
+   // Compare the editor against the exact snapshot used by the agent.
+   const current=projectRef.current;
+   const currentMap=new Map(current.files.map(file=>[file.path,file]));
+   const snapshotMap=new Map(snapshot.map(file=>[file.path,file]));
+   for(const operation of applySignal.operations){
+    const existing=currentMap.get(operation.path);
+    const original=snapshotMap.get(operation.path);
+    if(operation.action==="create"&&existing)throw new Error("O arquivo "+operation.path+" foi criado localmente durante a geração. A aplicação foi cancelada.");
+    if((operation.action==="update"||operation.action==="delete")&&(!existing||!original||existing.content!==original.content)){
+     throw new Error("O arquivo "+operation.path+" foi alterado durante a geração. A aplicação foi cancelada para preservar sua edição.");
+    }
+   }
+
+   const nextMap=new Map(current.files.map(file=>[file.path,file]));
+   for(const operation of applySignal.operations){
+    if(operation.action==="delete"){nextMap.delete(operation.path);continue}
+    const content=pendingFiles.get(operation.path);
+    if(typeof content!=="string"||content.length!==applySignal.fileLengths[operation.path])throw new Error("Conteúdo final ausente para "+operation.path+".");
+    nextMap.set(operation.path,{path:operation.path,content,updatedAt:Date.now()});
+   }
+   const nextProject={...current,files:[...nextMap.values()].sort((a,b)=>a.path.localeCompare(b.path))};
+   setProject(nextProject);
+   projectRef.current=nextProject;
+   const firstChanged=applySignal.operations.find(operation=>operation.action!=="delete");
+   if(firstChanged){setSelectedPath(firstChanged.path);setTab("preview")}
+   else if(applySignal.operations.length){setSelectedPath(nextProject.files[0]?.path||"");setTab("code")}
+   setHistory(old=>[...old,{role:"assistant",text:applySignal!.summary}]);
+   setPrompt("");
+   setStatus(applySignal.summary+" · "+applySignal.operations.filter(operation=>operation.action!=="delete").length+" arquivo(s) gerado(s), "+applySignal.operations.filter(operation=>operation.action==="delete").length+" excluído(s).");
+  }catch(error){
+   const message=error instanceof Error?error.message:"Falha ao aplicar alterações.";
+   setStatus(message);
+   setHistory(old=>[...old,{role:"assistant",text:"Não consegui aplicar as alterações: "+message}]);
+  }finally{setBusy(false)}
  }
  return <main className="studio-shell">
-  <header className="studio-topbar"><a href="/" className="studio-back">←</a><div className="studio-project"><b>{project.name}</b><small>RoboEduc AI Studio</small></div><button onClick={exportFiles}>Exportar</button><button onClick={()=>{const name=window.prompt("Nome do projeto",project.name);if(name?.trim())setProject(old=>({...old,name:name.trim()}))}}>Renomear</button></header>
+  <header className="studio-topbar"><a href="/" className="studio-back">←</a><div className="studio-project"><b>{project.name}</b><small>RoboEduc AI Studio</small></div><button onClick={exportFiles}>Exportar</button><button disabled={busy} onClick={()=>{const name=window.prompt("Nome do projeto",project.name);if(name?.trim())setProject(old=>({...old,name:name.trim()}))}}>Renomear</button></header>
   <nav className="studio-main-tabs"><button className={tab==="chat"?"selected":""} onClick={()=>setTab("chat")}>✦ Chat</button><button className={tab==="code"?"selected":""} onClick={()=>setTab("code")}>‹/› Código <small>{files.length}</small></button><button className={tab==="preview"?"selected":""} onClick={()=>setTab("preview")}>◉ Prévia</button></nav>
   {tab==="chat"&&<section className="studio-chat-view"><div className="studio-chat-history">{history.length===0&&<div className="studio-chat-intro"><div>✦</div><h1>O que vamos construir?</h1><p>Descreva o que deseja. A IA vai analisar e editar os arquivos do projeto.</p></div>}{history.map((item,i)=><article key={i} className={"studio-message "+item.role}><b>{item.role==="user"?"Você":"RoboEduc AI"}</b><p>{item.text}</p></article>)}{busy&&<article className="studio-message assistant"><b>RoboEduc AI</b><p className="studio-thinking">{status}</p></article>}</div><div className="studio-chat-composer"><textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void askAI()}}} placeholder="Descreva o que deseja criar ou modificar..." disabled={busy}/><div className="studio-controls"><select value={model} onChange={e=>setModel(e.target.value)} disabled={busy}><option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next</option><option value="openrouter:qwen/qwen-2.5-coder-32b-instruct">Qwen2.5 Coder 32B (teste)</option><option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash</option><option value="cloudflare">Cloudflare Workers AI</option><option value="google/gemma-4-31b-it:free">Gemma 4 31B</option><option value="cohere/north-mini-code:free">North Mini Code</option></select><select value={mode} onChange={e=>setMode(e.target.value)} disabled={busy}><option value="complete">Completo</option><option value="deep">Profundo</option><option value="fast">Rápido</option></select><button onClick={()=>void askAI()} disabled={busy||!prompt.trim()}>{busy?"Gerando...":"Enviar ↑"}</button></div><small>Enter envia · Shift + Enter quebra linha</small></div></section>}
-  {tab==="code"&&<section className="studio-code-view"><aside className="studio-file-rail"><div className="studio-file-heading"><b>ARQUIVOS</b><button onClick={addFile}>＋</button></div>{files.map(f=><button key={f.path} className={selected?.path===f.path?"active":""} onClick={()=>setSelectedPath(f.path)}>{f.path}</button>)}<div className="studio-file-footer"><button onClick={exportFiles}>Exportar</button><button onClick={removeFile} disabled={!selected}>Excluir</button></div></aside><div className="studio-editor-pane"><div className="studio-editor-title">{selected?.path||"Nenhum arquivo"}</div><textarea className="studio-editor" spellCheck={false} value={selected?.content||""} onChange={e=>updateSelected(e.target.value)}/></div></section>}
+  {tab==="code"&&<section className="studio-code-view"><aside className="studio-file-rail"><div className="studio-file-heading"><b>ARQUIVOS</b><button onClick={addFile} disabled={busy}>＋</button></div>{files.map(f=><button key={f.path} className={selected?.path===f.path?"active":""} onClick={()=>setSelectedPath(f.path)}>{f.path}</button>)}<div className="studio-file-footer"><button onClick={exportFiles}>Exportar</button><button onClick={removeFile} disabled={!selected||busy}>Excluir</button></div></aside><div className="studio-editor-pane"><div className="studio-editor-title">{selected?.path||"Nenhum arquivo"}</div><textarea className="studio-editor" spellCheck={false} disabled={busy} value={selected?.content||""} onChange={e=>updateSelected(e.target.value)}/></div></section>}
   {tab==="preview"&&<section className="studio-preview-view"><div className="studio-preview-toolbar"><span>◉ Prévia do projeto</span><button onClick={()=>setTab("code")}>‹/› Código</button></div>{html?<iframe title="Prévia do projeto" className="studio-preview-frame" sandbox="allow-scripts" srcDoc={preview}/>:<div className="studio-empty-preview">Projeto sem index.html. <button onClick={()=>setTab("chat")}>Criar com IA</button></div>}</section>}
   <footer className="studio-statusbar"><span>● Projeto local</span><span>{files.length} arquivos</span><span>{status}</span></footer>
  </main>;
