@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import MinecraftSurvival from "../games/MinecraftSurvival";
 
-type Option = { id: string; name: string; image: string };
 const questions = [
  { title:"Qual vai ser o estilo?", hint:"Escolha uma imagem.", options:[
   {id:"minecraft",name:"Minecraft",image:"https://commons.wikimedia.org/wiki/Special:FilePath/Minecraft%20-%201.18%20mountains.jpg"},
@@ -37,7 +36,7 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
   const canvas=canvasRef.current;if(!canvas)return;
   const ctx=canvas.getContext("2d");if(!ctx)return;
   const W=960,H=540,worldW=3000;
-  let player={x:70,y:365,vx:0,vy:0,w:34,h:48,onGround:false,invuln:0,attack:0,jumps:0};
+  const player={x:70,y:365,vx:0,vy:0,w:34,h:48,onGround:false,invuln:0,attack:0,jumps:0};
   let camera=0,localScore=0,localLives=isSurvival?4:3,done=false,frame=0,lastTime=0,elapsed=0,collectedCount=0,enemyKills=0,jumpWasDown=false;
   const colors=isMinecraft?{sky:"#79bde9",far:"#5e9d74",top:"#78b84c",side:"#8c633f",accent:"#f0c94c",player:"#42a447"}:
    isFortnite?{sky:"#8da9cf",far:"#596b91",top:"#7788a7",side:"#3d4b68",accent:"#ffca4b",player:"#e8a45b"}:
@@ -112,7 +111,7 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
   };
   raf=requestAnimationFrame(draw);
   return()=>{cancelAnimationFrame(raf);observer.disconnect();window.removeEventListener("keydown",keyDown);window.removeEventListener("keyup",keyUp);keys.current={left:false,right:false,jump:false,attack:false};};
- },[restart,styleId,objectiveId,typeId,isSurvival,isAction,isBattle,isBuild,isExplore,isRace,isSonic,isMinecraft,isFortnite]);
+ },[restart,styleId,objectiveId,typeId,isSurvival,isAction,isBattle,isBuild,isExplore,isRace,isSonic,isMinecraft,isFortnite,isAdventure]);
  const hold=(key:"left"|"right"|"jump"|"attack",value:boolean)=>{keys.current[key]=value;};
  const restartGame=()=>{setScore(0);setLives(isSurvival?4:3);setProgress(0);setWon(false);setLost(false);setRestart(v=>v+1);};
  const goalText=isBuild?"Colete 5 blocos e alcance a saída":isExplore?"Encontre 6 cristais e alcance a saída":isBattle?"Derrote todos os inimigos e alcance a saída":isRace?"Ative os 3 checkpoints e corra até a saída":"Chegue ao portal no final da fase";

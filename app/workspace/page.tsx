@@ -1,11 +1,13 @@
 "use client";
 
 import "./workspace.css";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type ProjectFile = { path: string; content: string; updatedAt: number };
 type Project = { name: string; files: ProjectFile[] };
 type WorkspaceOperation = { path: string; action: "create" | "update" | "delete"; reason: string };
+type WorkspaceStreamEvent = { type?: unknown; [key: string]: unknown };
 type Tab = "chat" | "code" | "preview";
 const STORAGE_KEY = "roboeduc-workspace-v1";
 const starterFiles: ProjectFile[] = [
@@ -24,7 +26,7 @@ function makePreview(html:string,files:ProjectFile[]){
 export default function WorkspacePage(){
  const [project,setProject]=useState<Project>({name:"Meu projeto",files:starterFiles});
  const projectRef=useRef(project);
- projectRef.current=project;
+ useEffect(()=>{projectRef.current=project},[project]);
  const [selectedPath,setSelectedPath]=useState("index.html");
  const [prompt,setPrompt]=useState("");
  const [busy,setBusy]=useState(false);
@@ -37,7 +39,19 @@ export default function WorkspacePage(){
  const selected=files.find(file=>file.path===selectedPath)||files[0];
  const html=files.find(file=>file.path==="index.html")?.content||files.find(file=>file.path.toLowerCase().endsWith(".html"))?.content||"";
  const preview=useMemo(()=>makePreview(html,files),[html,files]);
- useEffect(()=>{try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const parsed=JSON.parse(raw);if(parsed&&Array.isArray(parsed.files)&&parsed.files.length)setProject(parsed)}}catch{localStorage.removeItem(STORAGE_KEY)}},[]);
+ useEffect(()=>{
+  try{
+   const raw=localStorage.getItem(STORAGE_KEY);
+   if(raw){
+    const parsed=JSON.parse(raw);
+    if(parsed&&Array.isArray(parsed.files)&&parsed.files.length){
+     // Restore persisted workspace after mount to avoid an SSR/localStorage mismatch.
+     // eslint-disable-next-line react-hooks/set-state-in-effect
+     setProject(parsed);
+    }
+   }
+  }catch{localStorage.removeItem(STORAGE_KEY)}
+ },[]);
  useEffect(()=>{localStorage.setItem(STORAGE_KEY,JSON.stringify(project))},[project]);
  function updateSelected(value:string){if(!selected)return;setProject(old=>({...old,files:old.files.map(f=>f.path===selected.path?{...f,content:value,updatedAt:Date.now()}:f)}))}
  function addFile(){const raw=window.prompt("Caminho do novo arquivo (ex.: src/player.js)");if(!raw)return;const path=raw.trim().replace(/^\/+/, "").replace(/\\/g,"/");if(!path||path.split("/").includes("..")||files.some(f=>f.path===path)){setStatus("Caminho inválido ou arquivo já existente.");return}setProject(old=>({...old,files:[...old.files,{path,content:"",updatedAt:Date.now()}]}));setSelectedPath(path);setTab("code")}
@@ -78,9 +92,12 @@ export default function WorkspacePage(){
     const dataLines=eventText.split(/\r?\n/).filter(line=>line.startsWith("data:"));
     if(!dataLines.length)return;
     const payload=dataLines.map(line=>line.slice(5).replace(/^ /,"")).join("\n");
-    let event:any;
-    try{event=JSON.parse(payload)}
-    catch{throw new Error("O fluxo SSE contém um evento inválido ou truncado. Nenhuma alteração foi aplicada.")}
+    let event:WorkspaceStreamEvent;
+     try{
+      const parsed:unknown=JSON.parse(payload);
+      if(!parsed||typeof parsed!=="object"||!("type" in parsed)||typeof parsed.type!=="string")throw new Error("Evento sem tipo válido.");
+      event=parsed as WorkspaceStreamEvent;
+     }catch{throw new Error("O fluxo SSE contém um evento inválido ou truncado. Nenhuma alteração foi aplicada.")}
     if(event.type==="status"&&typeof event.detail==="string"){setStatus(event.detail);return}
     if(event.type==="plan"){
      if(plan)throw new Error("O servidor enviou mais de um manifesto para a mesma operação.");
@@ -175,7 +192,7 @@ export default function WorkspacePage(){
    const firstChanged=completedApplySignal.operations.find(operation=>operation.action!=="delete");
    if(firstChanged){setSelectedPath(firstChanged.path);setTab("preview")}
    else if(completedApplySignal.operations.length){setSelectedPath(nextProject.files[0]?.path||"");setTab("code")}
-   setHistory(old=>[...old,{role:"assistant",text:applySignal!.summary}]);
+   setHistory(old=>[...old,{role:"assistant",text:completedApplySignal.summary}]);
    setPrompt("");
    setStatus(completedApplySignal.summary+" · "+completedApplySignal.operations.filter(operation=>operation.action!=="delete").length+" arquivo(s) gerado(s), "+completedApplySignal.operations.filter(operation=>operation.action==="delete").length+" excluído(s).");
   }catch(error){
@@ -185,7 +202,7 @@ export default function WorkspacePage(){
   }finally{setBusy(false)}
  }
  return <main className="studio-shell">
-  <header className="studio-topbar"><a href="/" className="studio-back">←</a><div className="studio-project"><b>{project.name}</b><small>RoboEduc AI Studio</small></div><button onClick={exportFiles}>Exportar</button><button disabled={busy} onClick={()=>{const name=window.prompt("Nome do projeto",project.name);if(name?.trim())setProject(old=>({...old,name:name.trim()}))}}>Renomear</button></header>
+  <header className="studio-topbar"><Link href="/" className="studio-back">←</Link><div className="studio-project"><b>{project.name}</b><small>RoboEduc AI Studio</small></div><button onClick={exportFiles}>Exportar</button><button disabled={busy} onClick={()=>{const name=window.prompt("Nome do projeto",project.name);if(name?.trim())setProject(old=>({...old,name:name.trim()}))}}>Renomear</button></header>
   <nav className="studio-main-tabs"><button className={tab==="chat"?"selected":""} onClick={()=>setTab("chat")}>✦ Chat</button><button className={tab==="code"?"selected":""} onClick={()=>setTab("code")}>‹/› Código <small>{files.length}</small></button><button className={tab==="preview"?"selected":""} onClick={()=>setTab("preview")}>◉ Prévia</button></nav>
   {tab==="chat"&&<section className="studio-chat-view"><div className="studio-chat-history">{history.length===0&&<div className="studio-chat-intro"><div>✦</div><h1>O que vamos construir?</h1><p>Descreva o que deseja. A IA vai analisar e editar os arquivos do projeto.</p></div>}{history.map((item,i)=><article key={i} className={"studio-message "+item.role}><b>{item.role==="user"?"Você":"RoboEduc AI"}</b><p>{item.text}</p></article>)}{busy&&<article className="studio-message assistant"><b>RoboEduc AI</b><p className="studio-thinking">{status}</p></article>}</div><div className="studio-chat-composer"><textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void askAI()}}} placeholder="Descreva o que deseja criar ou modificar..." disabled={busy}/><div className="studio-controls"><select value={model} onChange={e=>setModel(e.target.value)} disabled={busy}><option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next</option><option value="openrouter:qwen/qwen-2.5-coder-32b-instruct">Qwen2.5 Coder 32B (teste)</option><option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash</option><option value="cloudflare">Cloudflare Workers AI</option><option value="google/gemma-4-31b-it:free">Gemma 4 31B</option><option value="cohere/north-mini-code:free">North Mini Code</option></select><select value={mode} onChange={e=>setMode(e.target.value)} disabled={busy}><option value="complete">Completo</option><option value="deep">Profundo</option><option value="fast">Rápido</option></select><button onClick={()=>void askAI()} disabled={busy||!prompt.trim()}>{busy?"Gerando...":"Enviar ↑"}</button></div><small>Enter envia · Shift + Enter quebra linha</small></div></section>}
   {tab==="code"&&<section className="studio-code-view"><aside className="studio-file-rail"><div className="studio-file-heading"><b>ARQUIVOS</b><button onClick={addFile} disabled={busy}>＋</button></div>{files.map(f=><button key={f.path} className={selected?.path===f.path?"active":""} onClick={()=>setSelectedPath(f.path)}>{f.path}</button>)}<div className="studio-file-footer"><button onClick={exportFiles}>Exportar</button><button onClick={removeFile} disabled={!selected||busy}>Excluir</button></div></aside><div className="studio-editor-pane"><div className="studio-editor-title">{selected?.path||"Nenhum arquivo"}</div><textarea className="studio-editor" spellCheck={false} disabled={busy} value={selected?.content||""} onChange={e=>updateSelected(e.target.value)}/></div></section>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import HtmlCodeRunner from "./components/HtmlCodeRunner";
 import MarkdownMessage from "./components/MarkdownMessage";
 
@@ -46,7 +47,10 @@ export default function Home() {
       if (raw) {
         const parsed = JSON.parse(raw) as Conversation[];
         if (Array.isArray(parsed)) {
+          // Restore client-only conversation history after mount.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setItems(parsed);
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setActiveId(parsed[0]?.id ?? "");
         }
       }
@@ -216,7 +220,7 @@ export default function Home() {
     <main className="studio-shell">
       <aside className={`studio-sidebar ${sidebar ? "open" : ""}`}>
         <div className="brand-row">
-          <a className="brand" href="/" aria-label="RoboEduc IA Studio"><span className="brand-mark">R</span><span className="brand-wordmark"><span className="brand-robo">ROBO</span><span className="brand-educ"><i>E</i><i>D</i><i>U</i><i>C</i></span><small>IA STUDIO</small></span></a>
+          <Link className="brand" href="/" aria-label="RoboEduc IA Studio"><span className="brand-mark">R</span><span className="brand-wordmark"><span className="brand-robo">ROBO</span><span className="brand-educ"><i>E</i><i>D</i><i>U</i><i>C</i></span><small>IA STUDIO</small></span></Link>
           <button className="mobile-close" onClick={() => setSidebar(false)}>×</button>
         </div>
         <button className="new-chat" onClick={newChat}><b>＋</b> Nova conversa</button>
