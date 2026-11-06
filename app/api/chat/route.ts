@@ -14,10 +14,10 @@ type ErrorEvent = { type: "error"; error: string };
 const MODEL = process.env.CLOUDFLARE_MODEL?.trim() || "@cf/qwen/qwen3-30b-a3b-fp8";
 const MAX_MESSAGES = 14;
 const MAX_MESSAGE_LENGTH = 40_000;
-const MAX_CONTEXT_CHARS = 40_000;
+const MAX_CONTEXT_CHARS = 28_000;
 const MAX_OUTPUT_TOKENS = 6_144;
 const MAX_DEEP_OUTPUT_TOKENS = 8_192;
-const MAX_REPAIR_TOKENS = 2_048;
+const MAX_REPAIR_TOKENS = 3_072;
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 const REVIEW_SYSTEM = `
@@ -151,6 +151,12 @@ async function readCloudflareStream(response: Response): Promise<string> {
   buffer += decoder.decode();
   if (buffer.trim()) consume(buffer);
   return answer.trim();
+}
+
+function isRuntimeRepairRequest(messages: ChatMessage[]) {
+  const latest = [...messages].reverse().find(message => message.role === "user")?.content ?? "";
+  return /Erros registrados:|corrija os erros.*execu[cç][aã]o|ReferenceError:|TypeError:|SyntaxError:/i.test(latest) &&
+    /Código atual:|\`\`\`html/i.test(latest);
 }
 
 function isLikelyCodeTask(messages: ChatMessage[], answer = "") {
@@ -351,25 +357,28 @@ export async function POST(request: Request) {
     const systemInstruction = requestedInstruction + "\n\n" + QUALITY_RULES;
     const mode: WorkMode = body.mode === "fast" || body.mode === "deep" ? body.mode : "complete";
     const codeTask = isLikelyCodeTask(messages);
-    const maxTokens = mode === "fast"
+    const runtimeRepair = isRuntimeRepairRequest(messages);
+    const maxTokens = runtimeRepair ? 4_096 : mode === "fast"
       ? (codeTask ? 4_096 : 3_072)
       : mode === "deep" ? MAX_DEEP_OUTPUT_TOKENS
         : codeTask ? MAX_OUTPUT_TOKENS : 4_096;
-    const repairTokens = mode === "deep" ? MAX_REPAIR_TOKENS : 1_536;
+    const repairTokens = runtimeRepair ? 4_096 : mode === "deep" ? MAX_REPAIR_TOKENS : 1_536;
 
     return toEvents(async (send, signal) => {
       const status = (stage: string, detail: string) => send({ type: "status", stage, detail });
       status("context", "Preparando o contexto e os requisitos da solicitação.");
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
 
-      let answer = await callModel(accountId, apiToken, messages, systemInstruction, maxTokens, signal, mode === "deep" ? 36_000 : 40_000);
+      let answer = await callModel(accountId, apiToken, messages, runtimeRepair
+        ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
+        : systemInstruction, maxTokens, signal, runtimeRepair ? 48_000 : mode === "deep" ? 36_000 : 40_000);
       if (!answer.trim()) throw new Error("O modelo encerrou a geração sem retornar texto. Tente novamente.");
 
       if (isLikelyCodeTask(messages, answer)) {
         status("review", "Verificando integridade dos blocos, sintaxe e sinais de código incompleto.");
         const findings = inspectCode(answer);
 
-        if (mode === "deep") {
+        if (mode === "deep" && !runtimeRepair) {
           status("audit", "Executando uma auditoria adicional de lógica e integração do código.");
           try {
             const audit = await callModel(
@@ -407,7 +416,9 @@ export async function POST(request: Request) {
             }
           ];
           try {
-            const repaired = await callModel(accountId, apiToken, repairMessages, systemInstruction, repairTokens, signal, mode === "deep" ? 12_000 : 15_000);
+            const repaired = await callModel(accountId, apiToken, repairMessages,
+              systemInstruction + "\\n\\nCORREÇÃO OBJETIVA: preserve o código e corrija somente os problemas apontados. Retorne o arquivo completo, sem auditoria adicional.",
+              repairTokens, signal, 8_000);
             if (repaired.trim()) {
               const remainingIssues = inspectCode(repaired);
               if (remainingIssues.length) {
