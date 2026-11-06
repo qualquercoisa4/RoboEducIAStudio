@@ -1,5 +1,7 @@
 "use client";
 
+import "./workspace.css";
+
 import { useEffect, useMemo, useState } from "react";
 
 type ProjectFile = { path: string; content: string; updatedAt: number };
