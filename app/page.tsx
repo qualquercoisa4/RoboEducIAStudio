@@ -213,7 +213,7 @@ export default function Home() {
     <main className="studio-shell">
       <aside className={`studio-sidebar ${sidebar ? "open" : ""}`}>
         <div className="brand-row">
-          <a className="brand" href="/"><span className="brand-mark">R</span><span>ROBOEDUC <b>IA</b><small>STUDIO</small></span></a>
+          <a className="brand" href="/" aria-label="RoboEduc IA Studio"><span className="brand-mark">R</span><span className="brand-wordmark"><span className="brand-robo">ROBO</span><span className="brand-educ"><i>E</i><i>D</i><i>U</i><i>C</i></span><small>IA STUDIO</small></span></a>
           <button className="mobile-close" onClick={() => setSidebar(false)}>×</button>
         </div>
         <button className="new-chat" onClick={newChat}><b>＋</b> Nova conversa</button>
@@ -250,10 +250,10 @@ export default function Home() {
         <div className={`chat-content ${messages.length ? "has-chat" : ""}`}>
           {!messages.length ? (
             <div className="welcome">
-              <div className="welcome-logo">R<span>✳</span></div>
+              <div className="welcome-brand" aria-label="RoboEduc"><span>ROBO</span><strong><i>E</i><i>D</i><i>U</i><i>C</i></strong><small>ESCOLA DE PROGRAMAÇÃO E ROBÓTICA</small></div>
               <small>SEU LABORATÓRIO DE IDEIAS</small>
-              <h1>O que vamos <em>descobrir</em> hoje?</h1>
-              <p>Uma IA para aprender, programar e transformar ideias em projetos.</p>
+              <h1>Ideias que viram <em>projetos.</em></h1>
+              <p>Seu espaço para aprender, programar e criar com inteligência artificial.</p>
               <div className="starter-grid">
                 {starters.map(([icon, name, description]) => (
                   <button key={name} onClick={() => send(description)}>
