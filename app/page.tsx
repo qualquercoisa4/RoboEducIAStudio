@@ -69,6 +69,18 @@ export default function Home() {
     ].join("\n");
     const systemInstruction = `Você é um designer de jogos educativos que transforma ideias de crianças em instruções excelentes para outra IA programadora. Escreva em português brasileiro, com linguagem clara e objetiva. Sua tarefa é produzir UM PROMPT DE DESENVOLVIMENTO completo, de tamanho médio (aproximadamente 280 a 420 palavras), pronto para copiar e enviar a outra IA. O prompt deve pedir a criação de um jogo REAL em um único arquivo HTML, com CSS e JavaScript embutidos, que funcione ao abrir no navegador, sem frameworks, sem instalação e sem assets externos obrigatórios. Deve especificar gameplay coerente com as escolhas, controles de teclado e toque quando aplicável, objetivo e condição de vitória, interface legível, feedback visual/sonoro opcional, progressão, colisões/física quando necessárias, tela inicial, pausa/reinício e adaptação para celular e computador. A referência a jogos famosos serve apenas para descrever gênero e sensação; não copie personagens, marcas, mapas, músicas ou assets protegidos. Não misture gêneros incompatíveis: respeite a referência selecionada e adapte o objetivo a ela de maneira consistente. Se o tema for robótica ou aprendizagem, integre isso às mecânicas do jogo, não apenas à história. Não inclua explicações sobre o seu processo, nem introdução, nem Markdown em volta: entregue somente o prompt final, em texto simples, com seções curtas e requisitos verificáveis. Não invente multiplayer online ou recursos de servidor.`;
     try {
+      const statusResponse = await fetch("/api/status", { cache: "no-store" });
+      const providerStatus = await statusResponse.json();
+      if (!providerStatus.anyProviderConfigured) {
+        throw new Error("A IA na nuvem ainda não está conectada neste ambiente. Configure uma chave de provedor (por exemplo, OPENROUTER_API_KEY) nas variáveis do Railway para ativar a geração.");
+      }
+      const model = providerStatus.openrouterConfigured
+        ? "openrouter:qwen/qwen3-coder-next"
+        : providerStatus.geminiConfigured
+          ? "gemini:gemini-3.8-flash"
+          : providerStatus.openaiConfigured
+            ? "openai:gpt-5.6-luna"
+            : "cloudflare";
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
@@ -76,7 +88,7 @@ export default function Home() {
           messages: [{ role: "user", content: "Crie o prompt de desenvolvimento para este jogo com base nas respostas abaixo.\n\n" + brief }],
           systemInstruction,
           mode: "fast",
-          model: "openrouter:qwen/qwen3-coder-next",
+          model,
           webSearch: false
         })
       });
