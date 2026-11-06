@@ -181,10 +181,7 @@ export default function Home() {
     } catch (exception) {
       const aborted = exception instanceof Error && exception.name === "AbortError";
       if (!aborted) setError(exception instanceof Error ? exception.message : "Não foi possível gerar uma resposta.");
-      const latest = items.find(item => item.id === id)?.messages ?? pending;
-      if (latest.at(-1)?.role === "assistant" && !latest.at(-1)?.content) {
-        patch(id, latest.slice(0, -1));
-      }
+      patch(id, answer.trim() ? [...base, { role: "assistant", content: answer }] : base);
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
       setLoading(false);
