@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 type LocalGenerator = { tokenizer: unknown; (messages: Message[], options: { max_new_tokens: number; do_sample: boolean; streamer: unknown }): Promise<unknown> };
 
-type Message = { role: "user" | "assistant"; content: string };
+type Message = { role: string; content: string };
 type Conversation = { id: string; title: string; messages: Message[]; updatedAt: number };
 const KEY = "roboeduc-ai-history-v1";
 const starters = [
