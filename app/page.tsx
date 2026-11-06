@@ -1,82 +1,331 @@
 "use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
+import HtmlCodeRunner from "./components/HtmlCodeRunner";
+
 type Message = { role: string; content: string };
 type Conversation = { id: string; title: string; messages: Message[]; updatedAt: number };
+type WorkMode = "fast" | "complete" | "deep";
+
 const KEY = "roboeduc-ai-history-v1";
 const starters = [
-  ["⌘","Programação","Explique como funciona um loop for em JavaScript, com exemplo."],
-  ["⚙","Robótica","Como conectar um servo motor ao Arduino Uno com segurança?"],
-  ["◈","Projetos","Me ajude a planejar um projeto de robótica para iniciantes."],
-  ["▤","Aprender","Explique inteligência artificial de um jeito simples e prático."]
+  ["⌘", "Programação", "Explique como funciona um loop for em JavaScript, com exemplo."],
+  ["⚙", "Robótica", "Como conectar um servo motor ao Arduino Uno com segurança?"],
+  ["◈", "Projetos", "Me ajude a planejar um projeto de robótica para iniciantes."],
+  ["▤", "Aprender", "Explique inteligência artificial de um jeito simples e prático."]
 ];
-const SYSTEM = "Você é o RoboEduc AI, um assistente educacional especializado em tecnologia, robótica, eletrônica, programação, ciências e criação de projetos. Responda em português brasileiro, com precisão, clareza e exemplos práticos. Ao gerar código, forneça soluções completas, explique onde salvar e como executar. Se não souber, diga que não sabe. Não invente testes ou resultados.";
-const titleOf = (s: string) => s.trim().replace(/\s+/g," ").slice(0,42) || "Nova conversa";
+const SYSTEM = "Você é o RoboEduc AI, assistente educacional especializado em tecnologia, robótica, eletrônica, programação, ciências e criação de projetos. Responda em português brasileiro, com precisão e exemplos práticos. Ao gerar código, forneça soluções completas, explique onde salvar e como executar. Se não souber, diga que não sabe. Não invente testes ou resultados.";
+const titleOf = (s: string) => s.trim().replace(/\s+/g, " ").slice(0, 42) || "Nova conversa";
 
 export default function Home() {
- const [items,setItems]=useState<Conversation[]>([]),[activeId,setActiveId]=useState("");
- const [input,setInput]=useState(""),[loading,setLoading]=useState(false);
- const [cloudReady,setCloudReady]=useState(false);
- const [sidebar,setSidebar]=useState(false),[error,setError]=useState("");
- const bottom=useRef<HTMLDivElement>(null),area=useRef<HTMLTextAreaElement>(null);
- const cancelRef=useRef(false);
- const active=items.find(x=>x.id===activeId),messages=active?.messages??[];
- useEffect(()=>{try{const raw=localStorage.getItem(KEY);if(raw){const parsed=JSON.parse(raw) as Conversation[];if(Array.isArray(parsed)){setItems(parsed);setActiveId(parsed[0]?.id??"");}}}catch{} fetch("/api/status").then(r=>r.json()).then(x=>setCloudReady(Boolean(x.configured))).catch(()=>setCloudReady(false));},[]);
- useEffect(()=>{if(items.length)localStorage.setItem(KEY,JSON.stringify(items));else localStorage.removeItem(KEY);},[items]);
- useEffect(()=>{bottom.current?.scrollIntoView({behavior:"smooth",block:"end"});},[messages,loading]);
- const newChat=useCallback(()=>{cancelRef.current=true;const id=crypto.randomUUID();setItems(old=>[{id,title:"Nova conversa",messages:[],updatedAt:Date.now()},...old]);setActiveId(id);setInput("");setError("");setSidebar(false);area.current?.focus();},[]);
- const patch=(id:string,msgs:Message[],title?:string)=>setItems(old=>old.map(x=>x.id===id?{...x,messages:msgs,title:title??x.title,updatedAt:Date.now()}:x).sort((a,b)=>b.updatedAt-a.updatedAt));
+  const [items, setItems] = useState<Conversation[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [cloudReady, setCloudReady] = useState(false);
+  const [sidebar, setSidebar] = useState(false);
+  const [error, setError] = useState("");
+  const [mode, setMode] = useState<WorkMode>("complete");
+  const [processSteps, setProcessSteps] = useState<string[]>([]);
+  const bottom = useRef<HTMLDivElement>(null);
+  const area = useRef<HTMLTextAreaElement>(null);
+  const controllerRef = useRef<AbortController | null>(null);
+  const active = items.find(item => item.id === activeId);
+  const messages = active?.messages ?? [];
 
- async function send(value?:string){
-  const text=(value??input).trim();if(!text||loading)return;
-  if(!cloudReady){setError("A IA na nuvem ainda não foi configurada. É necessário adicionar as credenciais Cloudflare na Vercel.");return;}
-  let id=activeId;const existing=items.find(x=>x.id===id);
-  if(!existing){id=crypto.randomUUID();setItems(old=>[{id,title:titleOf(text),messages:[],updatedAt:Date.now()},...old]);setActiveId(id);}
-  const old=existing?.messages??[],base:Message[]=[...old,{role:"user",content:text}];
-  const pending:Message[]=[...base,{role:"assistant",content:""}];patch(id,pending,old.length?undefined:titleOf(text));
-  setInput("");setError("");setLoading(true);cancelRef.current=false;
-  try{
-   let answer="";
-   const append=(part:string)=>{answer+=part;patch(id,[...base,{role:"assistant",content:answer}]);};
-   const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json","Accept":"text/event-stream"},body:JSON.stringify({messages:base,systemInstruction:SYSTEM})});
-   if(!res.ok){const data=await res.json().catch(()=>null);throw new Error(data?.error??`Falha HTTP ${res.status}.`);}
-   if(!res.body)throw new Error("O servidor não retornou um fluxo de resposta.");
-   const reader=res.body.getReader(),decoder=new TextDecoder();let buffer="";
-   while(true){
-    const {value,done}=await reader.read();if(done)break;
-    buffer+=decoder.decode(value,{stream:true});
-    const chunks=buffer.split("\n\n");buffer=chunks.pop()??"";
-    for(const chunk of chunks)for(const line of chunk.split("\n")){
-     if(!line.startsWith("data:"))continue;
-     const raw=line.slice(5).trim();if(!raw||raw==="[DONE]")continue;
-     try{const data=JSON.parse(raw);const token=data.response??data.result?.response??data.choices?.[0]?.delta?.content??data.delta?.response??"";if(typeof token==="string"&&token)append(token);if(data.error)throw new Error(data.error);}
-     catch(e){if(e instanceof SyntaxError)continue;throw e;}
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Conversation[];
+        if (Array.isArray(parsed)) {
+          setItems(parsed);
+          setActiveId(parsed[0]?.id ?? "");
+        }
+      }
+    } catch {
+      localStorage.removeItem(KEY);
     }
-   }
-   if(!answer.trim()&&!cancelRef.current)throw new Error("A IA encerrou a geração sem texto. Tente novamente.");
-  }catch(e){setError(e instanceof Error?e.message:"Não foi possível gerar uma resposta.");const latest=items.find(x=>x.id===id)?.messages??pending;if(latest.at(-1)?.role==="assistant"&&!latest.at(-1)?.content)patch(id,latest.slice(0,-1));}
-  finally{setLoading(false);area.current?.focus();}
- }
- const stop=()=>{cancelRef.current=true;};
- const remove=(id:string)=>{const left=items.filter(x=>x.id!==id);setItems(left);if(id===activeId)setActiveId(left[0]?.id??"");};
- return <main className="studio-shell">
-  <aside className={`studio-sidebar ${sidebar?"open":""}`}>
-   <div className="brand-row"><a className="brand" href="/"><span className="brand-mark">R</span><span>ROBOEDUC <b>IA</b><small>STUDIO</small></span></a><button className="mobile-close" onClick={()=>setSidebar(false)}>×</button></div>
-   <button className="new-chat" onClick={newChat}><b>＋</b> Nova conversa</button><div className="history-heading">RECENTES</div>
-   <div className="history-list">{items.map(x=><div className={`history-item ${x.id===activeId?"current":""}`} key={x.id}><button onClick={()=>{setActiveId(x.id);setSidebar(false);setError("");}}>◌ <span>{x.title}</span></button><button className="remove-chat" onClick={()=>remove(x.id)} aria-label="Excluir conversa">×</button></div>)}{!items.length&&<p className="no-history">Suas conversas aparecerão aqui.</p>}</div>
-   <div className="sidebar-footer"><a className="studio-link" href="/studio">▦　Abrir Game Studio　↗</a><div className="model-status"><i className={cloudReady?"online":""}/><span><b>RoboEduc AI</b><small>{cloudReady?"IA na nuvem conectada":"Nuvem não configurada"}</small></span></div></div>
-  </aside>
-  {sidebar&&<button className="sidebar-overlay" onClick={()=>setSidebar(false)} aria-label="Fechar menu"/>}
-  <section className="chat-main">
-   <header className="chat-top"><button className="mobile-menu" onClick={()=>setSidebar(true)} aria-label="Abrir menu">☰</button><div>Assistente inteligente <span>BETA</span></div><a href="/studio">Game Studio ↗</a></header>
-   <div className={`chat-content ${messages.length?"has-chat":""}`}>
-    {!messages.length?<div className="welcome"><div className="welcome-logo">R<span>✳</span></div><small>SEU LABORATÓRIO DE IDEIAS</small><h1>O que vamos <em>descobrir</em> hoje?</h1><p>Uma IA para aprender, programar e transformar ideias em projetos.</p><div className="starter-grid">{starters.map(([icon,name,desc])=><button key={name} onClick={()=>send(desc)}><span>{icon}</span><b>{name}</b><small>{desc}</small><i>↗</i></button>)}</div></div>:<div className="messages">{messages.map((m,i)=><article className={`message ${m.role}`} key={i}><div className="avatar">{m.role==="assistant"?"R":"V"}</div><div className="message-body"><b>{m.role==="assistant"?"ROBOEDUC AI":"VOCÊ"}</b><div>{m.content||<span className="typing"><i/><i/><i/></span>}</div></div></article>)}<div ref={bottom}/></div>}
-   </div>
-   <div className="composer-area">
-    <div className="local-ai-panel"><div><b>{cloudReady?"IA hospedada na nuvem":"Configuração da IA na nuvem pendente"}</b><small>{cloudReady?"As mensagens são processadas no servidor. O celular não precisa baixar nem executar modelos.":"O chat está pronto para usar Cloudflare Workers AI, mas faltam as credenciais de acesso no servidor."}</small></div><span>{cloudReady?"CONECTADA":"AGUARDANDO"}</span></div>
-    {error&&<div className="error-banner">{error}<button onClick={()=>setError("")}>Fechar</button></div>}
-    <div className="composer"><textarea ref={area} rows={1} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Pergunte qualquer coisa…" disabled={loading}/>{loading?<button className="send stop" onClick={stop}>■</button>:<button className="send" disabled={!input.trim()} onClick={()=>send()}>↑</button>}</div>
-    <div className="composer-help">Enter para enviar · Shift + Enter para nova linha</div><div className="fine-print">Processamento remoto · o desempenho depende da conexão e da disponibilidade do provedor.</div>
-   </div>
-  </section>
- </main>;
+    fetch("/api/status")
+      .then(response => response.json())
+      .then(data => setCloudReady(Boolean(data.configured)))
+      .catch(() => setCloudReady(false));
+  }, []);
+
+  useEffect(() => {
+    if (items.length) localStorage.setItem(KEY, JSON.stringify(items));
+    else localStorage.removeItem(KEY);
+  }, [items]);
+
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, loading, processSteps]);
+
+  const patch = (id: string, nextMessages: Message[], title?: string) => {
+    setItems(old => old.map(item => item.id === id
+      ? { ...item, messages: nextMessages, title: title ?? item.title, updatedAt: Date.now() }
+      : item
+    ).sort((a, b) => b.updatedAt - a.updatedAt));
+  };
+
+  const newChat = useCallback(() => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    setLoading(false);
+    setProcessSteps([]);
+    const id = crypto.randomUUID();
+    setItems(old => [{ id, title: "Nova conversa", messages: [], updatedAt: Date.now() }, ...old]);
+    setActiveId(id);
+    setInput("");
+    setError("");
+    setSidebar(false);
+    area.current?.focus();
+  }, []);
+
+  async function send(value?: string) {
+    const text = (value ?? input).trim();
+    if (!text || loading) return;
+    if (!cloudReady) {
+      setError("A IA na nuvem ainda não foi configurada. É necessário adicionar as credenciais Cloudflare na Vercel.");
+      return;
+    }
+
+    let id = activeId;
+    const existing = items.find(item => item.id === id);
+    if (!existing) {
+      id = crypto.randomUUID();
+      setItems(old => [{ id, title: titleOf(text), messages: [], updatedAt: Date.now() }, ...old]);
+      setActiveId(id);
+    }
+
+    const oldMessages = existing?.messages ?? [];
+    const base: Message[] = [...oldMessages, { role: "user", content: text }];
+    const pending: Message[] = [...base, { role: "assistant", content: "" }];
+    patch(id, pending, oldMessages.length ? undefined : titleOf(text));
+    setInput("");
+    setError("");
+    setProcessSteps([]);
+    setLoading(true);
+
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
+    try {
+      let answer = "";
+      const append = (part: string) => {
+        answer += part;
+        patch(id, [...base, { role: "assistant", content: answer }]);
+      };
+      const consumeEvent = (chunk: string) => {
+        for (const line of chunk.split(/\r?\n/)) {
+          if (!line.startsWith("data:")) continue;
+          const raw = line.slice(5).trim();
+          if (!raw || raw === "[DONE]") continue;
+          let data: {
+            type?: string;
+            stage?: string;
+            detail?: string;
+            response?: string;
+            error?: string;
+            result?: { response?: string };
+            choices?: Array<{ delta?: { content?: string } }>;
+            delta?: { response?: string };
+          };
+          try {
+            data = JSON.parse(raw);
+          } catch {
+            continue;
+          }
+          if (data.type === "status") {
+            const detail = data.detail || data.stage || "Processando";
+            setProcessSteps(previous => previous.at(-1) === detail ? previous : [...previous, detail].slice(-6));
+          } else if (data.type === "error" || data.error) {
+            throw new Error(data.error || "Falha durante o processamento.");
+          } else if (data.type === "token") {
+            if (typeof data.response === "string") append(data.response);
+          } else {
+            const legacyToken = data.response ?? data.result?.response ?? data.choices?.[0]?.delta?.content ?? data.delta?.response;
+            if (typeof legacyToken === "string" && legacyToken) append(legacyToken);
+          }
+        }
+      };
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+        body: JSON.stringify({ messages: base, systemInstruction: SYSTEM, mode }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error ?? `Falha HTTP ${response.status}.`);
+      }
+      if (!response.body) throw new Error("O servidor não retornou um fluxo de resposta.");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() ?? "";
+        for (const event of events) consumeEvent(event);
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) consumeEvent(buffer);
+
+      if (!answer.trim()) throw new Error("A IA encerrou a geração sem texto. Tente novamente.");
+    } catch (exception) {
+      const aborted = exception instanceof Error && exception.name === "AbortError";
+      if (!aborted) setError(exception instanceof Error ? exception.message : "Não foi possível gerar uma resposta.");
+      const latest = items.find(item => item.id === id)?.messages ?? pending;
+      if (latest.at(-1)?.role === "assistant" && !latest.at(-1)?.content) {
+        patch(id, latest.slice(0, -1));
+      }
+    } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
+      setLoading(false);
+      setProcessSteps([]);
+      area.current?.focus();
+    }
+  }
+
+  const stop = () => controllerRef.current?.abort();
+  const remove = (id: string) => {
+    const remaining = items.filter(item => item.id !== id);
+    setItems(remaining);
+    if (id === activeId) setActiveId(remaining[0]?.id ?? "");
+  };
+  const askForCodeFix = (code: string, errors: string[]) => {
+    const details = errors.map((item, index) => `${index + 1}. ${item}`).join("\n");
+    void send("Analise este código HTML e corrija os erros que apareceram durante a execução no navegador. Preserve o objetivo e as funcionalidades. Explique as correções e entregue o código completo.\n\nErros registrados:\n" + details + "\n\nCódigo atual:\n```html\n" + code + "\n```");
+  };
+
+  return (
+    <main className="studio-shell">
+      <aside className={`studio-sidebar ${sidebar ? "open" : ""}`}>
+        <div className="brand-row">
+          <a className="brand" href="/"><span className="brand-mark">R</span><span>ROBOEDUC <b>IA</b><small>STUDIO</small></span></a>
+          <button className="mobile-close" onClick={() => setSidebar(false)}>×</button>
+        </div>
+        <button className="new-chat" onClick={newChat}><b>＋</b> Nova conversa</button>
+        <div className="history-heading">RECENTES</div>
+        <div className="history-list">
+          {items.map(item => (
+            <div className={`history-item ${item.id === activeId ? "current" : ""}`} key={item.id}>
+              <button onClick={() => { setActiveId(item.id); setSidebar(false); setError(""); }}>
+                ◌ <span>{item.title}</span>
+              </button>
+              <button className="remove-chat" onClick={() => remove(item.id)} aria-label="Excluir conversa">×</button>
+            </div>
+          ))}
+          {!items.length && <p className="no-history">Suas conversas aparecerão aqui.</p>}
+        </div>
+        <div className="sidebar-footer">
+          <a className="studio-link" href="/studio">▦　Abrir Game Studio　↗</a>
+          <div className="model-status">
+            <i className={cloudReady ? "online" : ""} />
+            <span><b>RoboEduc AI</b><small>{cloudReady ? "IA na nuvem conectada" : "Nuvem não configurada"}</small></span>
+          </div>
+        </div>
+      </aside>
+
+      {sidebar && <button className="sidebar-overlay" onClick={() => setSidebar(false)} aria-label="Fechar menu" />}
+
+      <section className="chat-main">
+        <header className="chat-top">
+          <button className="mobile-menu" onClick={() => setSidebar(true)} aria-label="Abrir menu">☰</button>
+          <div>Assistente inteligente <span>BETA</span></div>
+          <a href="/studio">Game Studio ↗</a>
+        </header>
+
+        <div className={`chat-content ${messages.length ? "has-chat" : ""}`}>
+          {!messages.length ? (
+            <div className="welcome">
+              <div className="welcome-logo">R<span>✳</span></div>
+              <small>SEU LABORATÓRIO DE IDEIAS</small>
+              <h1>O que vamos <em>descobrir</em> hoje?</h1>
+              <p>Uma IA para aprender, programar e transformar ideias em projetos.</p>
+              <div className="starter-grid">
+                {starters.map(([icon, name, description]) => (
+                  <button key={name} onClick={() => send(description)}>
+                    <span>{icon}</span><b>{name}</b><small>{description}</small><i>↗</i>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="messages">
+              {messages.map((message, index) => (
+                <article className={`message ${message.role}`} key={index}>
+                  <div className="avatar">{message.role === "assistant" ? "R" : "V"}</div>
+                  <div className="message-body">
+                    <b>{message.role === "assistant" ? "ROBOEDUC AI" : "VOCÊ"}</b>
+                    <div className="message-text">
+                      {message.content || (loading ? <span className="typing"><i /><i /><i /></span> : null)}
+                    </div>
+                    {message.role === "assistant" && message.content && (
+                      <HtmlCodeRunner content={message.content} onAskFix={askForCodeFix} />
+                    )}
+                    {message.role === "assistant" && !message.content && loading && index === messages.length - 1 && (
+                      <div className="process-card" aria-live="polite">
+                        <div className="process-card-head"><span className="process-spinner" /> <strong>RoboEducIA em execução</strong></div>
+                        <div className="process-steps">
+                          {processSteps.map((step, stepIndex) => (
+                            <div className={stepIndex === processSteps.length - 1 ? "current" : "complete"} key={stepIndex}>
+                              <i>{stepIndex === processSteps.length - 1 ? "◌" : "✓"}</i><span>{step}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {!processSteps.length && <small>Preparando a solicitação...</small>}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))}
+              <div ref={bottom} />
+            </div>
+          )}
+        </div>
+
+        <div className="composer-area">
+          <div className="local-ai-panel">
+            <div>
+              <b>{cloudReady ? "IA hospedada na nuvem" : "Configuração da IA na nuvem pendente"}</b>
+              <small>{cloudReady ? "Geração adaptativa, revisão estática e executor HTML isolado." : "O chat está pronto para Cloudflare Workers AI, mas faltam as credenciais no servidor."}</small>
+            </div>
+            <span>{cloudReady ? "CONECTADA" : "AGUARDANDO"}</span>
+          </div>
+          {error && <div className="error-banner">{error}<button onClick={() => setError("")}>Fechar</button></div>}
+          <div className="mode-selector" aria-label="Nível de processamento">
+            <span>PROCESSAMENTO</span>
+            <div>
+              <button type="button" className={mode === "fast" ? "selected" : ""} onClick={() => setMode("fast")} disabled={loading} title="Respostas rápidas e perguntas simples">Rápido</button>
+              <button type="button" className={mode === "complete" ? "selected" : ""} onClick={() => setMode("complete")} disabled={loading} title="Equilíbrio entre qualidade e consumo">Completo</button>
+              <button type="button" className={mode === "deep" ? "selected" : ""} onClick={() => setMode("deep")} disabled={loading} title="Maior limite de saída para tarefas complexas">Profundo</button>
+            </div>
+          </div>
+          <div className="composer">
+            <textarea
+              ref={area}
+              rows={1}
+              value={input}
+              onChange={event => setInput(event.target.value)}
+              onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }}
+              placeholder="Pergunte qualquer coisa…"
+              disabled={loading}
+            />
+            {loading
+              ? <button className="send stop" onClick={stop} aria-label="Parar geração">■</button>
+              : <button className="send" disabled={!input.trim()} onClick={() => void send()} aria-label="Enviar mensagem">↑</button>}
+          </div>
+          <div className="composer-help">Enter para enviar · Shift + Enter para nova linha</div>
+          <div className="fine-print">O modo Profundo pode consumir mais Neurons. Códigos HTML podem ser executados em um ambiente isolado.</div>
+        </div>
+      </section>
+    </main>
+  );
 }
