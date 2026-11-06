@@ -143,7 +143,7 @@ export default function Home() {
     setError("");
     setSidebar(false);
     area.current?.focus();
-  }, []);
+  }, [setItems]);
 
   async function send(value?: string) {
     const text = (value ?? input).trim();
