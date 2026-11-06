@@ -30,6 +30,7 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState("cloudflare");
   const [openRouterReady, setOpenRouterReady] = useState(false);
   const [openAIReady, setOpenAIReady] = useState(false);
+  const [geminiReady, setGeminiReady] = useState(false);
   const [webSearch, setWebSearch] = useState(false);
   const [processSteps, setProcessSteps] = useState<string[]>([]);
   const bottom = useRef<HTMLDivElement>(null);
@@ -37,7 +38,7 @@ export default function Home() {
   const controllerRef = useRef<AbortController | null>(null);
   const active = items.find(item => item.id === activeId);
   const messages = active?.messages ?? [];
-  const selectedProviderReady = selectedModel === "cloudflare" ? cloudReady : selectedModel === "openai:gpt-5.6-luna" ? openAIReady : openRouterReady;
+  const selectedProviderReady = selectedModel === "cloudflare" ? cloudReady : selectedModel === "openai:gpt-5.6-luna" ? openAIReady : selectedModel.startsWith("gemini:") ? geminiReady : openRouterReady;
 
   useEffect(() => {
     try {
@@ -54,7 +55,7 @@ export default function Home() {
     }
     fetch("/api/status")
       .then(response => response.json())
-      .then(data => { setCloudReady(Boolean(data.configured)); setOpenRouterReady(Boolean(data.openrouterConfigured)); setOpenAIReady(Boolean(data.openaiConfigured)); })
+      .then(data => { setCloudReady(Boolean(data.configured)); setOpenRouterReady(Boolean(data.openrouterConfigured)); setOpenAIReady(Boolean(data.openaiConfigured)); setGeminiReady(Boolean(data.geminiConfigured)); })
       .catch(() => setCloudReady(false));
   }, []);
 
@@ -92,7 +93,7 @@ export default function Home() {
     const text = (value ?? input).trim();
     if (!text || loading) return;
     if (!selectedProviderReady) {
-      const requiredKey = selectedModel === "cloudflare" ? "CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN" : selectedModel === "openai:gpt-5.6-luna" ? "OPENAI_API_KEY" : "OPENROUTER_API_KEY";
+      const requiredKey = selectedModel === "cloudflare" ? "CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN" : selectedModel === "openai:gpt-5.6-luna" ? "OPENAI_API_KEY" : selectedModel.startsWith("gemini:") ? "GEMINI_API_KEY" : "OPENROUTER_API_KEY";
       setError("O provedor selecionado não está configurado. Adicione " + requiredKey + " nas variáveis de ambiente da Vercel.");
       return;
     }
@@ -160,7 +161,7 @@ export default function Home() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
-        body: JSON.stringify({ messages: base, systemInstruction: SYSTEM, mode, model: selectedModel, webSearch: selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && webSearch }),
+        body: JSON.stringify({ messages: base, systemInstruction: SYSTEM, mode, model: selectedModel, webSearch: selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:") && webSearch }),
         signal: controller.signal
       });
 
@@ -312,11 +313,12 @@ export default function Home() {
               <option value="cohere/north-mini-code:free" disabled={!openRouterReady}>North Mini Code · OpenRouter grátis</option>
               <option value="nvidia/nemotron-3-ultra-550b-a55b:free" disabled={!openRouterReady}>Nemotron 3 Ultra · OpenRouter grátis</option>
               <option value="google/gemma-4-31b-it:free" disabled={!openRouterReady}>Gemma 4 31B · OpenRouter grátis</option>
+              <option value="gemini:gemini-3.8-flash" disabled={!geminiReady}>Gemini 3.8 Flash · Google (nível gratuito)</option>
               <option value="openai:gpt-5.6-luna" disabled={!openAIReady}>GPT-5.6 Luna · OpenAI API (pago por uso)</option>
             </select>
-            <small>{selectedModel === "cloudflare" ? "Cloudflare Workers AI" : selectedModel === "openai:gpt-5.6-luna" ? (openAIReady ? "OpenAI API · cobrança por tokens" : "Configure OPENAI_API_KEY na Vercel para liberar o modelo") : openRouterReady ? "OpenRouter · disponibilidade e limites variam por modelo" : "Configure OPENROUTER_API_KEY na Vercel para liberar os modelos"}</small>
+            <small>{selectedModel === "cloudflare" ? "Cloudflare Workers AI" : selectedModel === "openai:gpt-5.6-luna" ? (openAIReady ? "OpenAI API · cobrança por tokens" : "Configure OPENAI_API_KEY na Vercel para liberar o modelo") : selectedModel.startsWith("gemini:") ? (geminiReady ? "Google Gemini API · Free Tier sujeito a cotas" : "Configure GEMINI_API_KEY na Vercel para liberar o modelo") : openRouterReady ? "OpenRouter · disponibilidade e limites variam por modelo" : "Configure OPENROUTER_API_KEY na Vercel para liberar os modelos"}</small>
           </div>
-          {selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && (
+          {selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:") && (
             <div className="web-search-toggle">
               <label><input type="checkbox" checked={webSearch} onChange={event => setWebSearch(event.target.checked)} disabled={loading || !openRouterReady} /> Pesquisar na internet</label>
               <small>Opcional. A pesquisa pode gerar cobrança adicional do mecanismo de busca; desligada por padrão.</small>
