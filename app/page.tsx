@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MLCEngine } from "@mlc-ai/web-llm";
+type LocalGenerator = { tokenizer: unknown; (messages: Message[], options: { max_new_tokens: number; do_sample: boolean; streamer: unknown }): Promise<unknown> };
 
 type Message = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; messages: Message[]; updatedAt: number };
@@ -20,7 +20,7 @@ export default function Home() {
  const [cloudReady,setCloudReady]=useState(false),[localState,setLocalState]=useState<"idle"|"loading"|"ready"|"error">("idle");
  const [progress,setProgress]=useState(""),[sidebar,setSidebar]=useState(false),[error,setError]=useState("");
  const bottom=useRef<HTMLDivElement>(null),area=useRef<HTMLTextAreaElement>(null);
- const engineRef=useRef<MLCEngine|null>(null),cancelRef=useRef(false);
+ const engineRef=useRef<LocalGenerator|null>(null),cancelRef=useRef(false);
  const active=items.find(x=>x.id===activeId),messages=active?.messages??[];
  useEffect(()=>{try{const raw=localStorage.getItem(KEY);if(raw){const parsed=JSON.parse(raw) as Conversation[];if(Array.isArray(parsed)){setItems(parsed);setActiveId(parsed[0]?.id??"");}}}catch{} fetch("/api/status").then(r=>r.json()).then(x=>setCloudReady(Boolean(x.configured))).catch(()=>setCloudReady(false));},[]);
  useEffect(()=>{if(items.length)localStorage.setItem(KEY,JSON.stringify(items));else localStorage.removeItem(KEY);},[items]);
@@ -30,17 +30,19 @@ export default function Home() {
 
  async function loadLocalModel(){
   if(localState==="loading"||engineRef.current)return;
-  if(!("gpu" in navigator)){setLocalState("error");setError("Este navegador não disponibiliza WebGPU. Abra o RoboEduc IA em uma versão atualizada do Chrome ou Edge em um dispositivo compatível.");return;}
-  setLocalState("loading");setError("");setProgress("Preparando motor de IA local…");
+  setLocalState("loading");setError("");setProgress("Baixando modelo de linguagem…");
   try{
-   const {CreateMLCEngine}=await import("@mlc-ai/web-llm");
-   const memory=(navigator as Navigator & {deviceMemory?:number}).deviceMemory??4;
-   const model=memory<=4?"Qwen2-0.5B-Instruct-q4f16_1-MLC":"Qwen2-1.5B-Instruct-q4f16_1-MLC";
-   const engine=await CreateMLCEngine(model,{initProgressCallback:(report)=>setProgress(report.text)});
-   engineRef.current=engine;setLocalState("ready");setProgress("Modelo carregado neste dispositivo.");
+   const {pipeline}=await import("@huggingface/transformers");
+   const hasWebGPU="gpu" in navigator;
+   const generator=await pipeline("text-generation","onnx-community/Qwen2.5-Coder-0.5B-Instruct",{
+    dtype:"q4",
+    ...(hasWebGPU?{device:"webgpu" as const}:{}),
+    progress_callback:(report)=>{if(report.status==="progress"&&typeof report.progress==="number")setProgress(`Baixando modelo: ${Math.round(report.progress)}%`);else if(report.status==="initiate")setProgress("Conectando ao repositório do modelo…");else if(report.status==="done")setProgress("Preparando pesos do modelo…");}
+   });
+   engineRef.current=generator as unknown as LocalGenerator;
+   setLocalState("ready");setProgress(hasWebGPU?"Modelo carregado com aceleração WebGPU.":"Modelo carregado em modo CPU (pode ser mais lento).");
   }catch(e){console.error("Local model initialization failed",e);setLocalState("error");setError(e instanceof Error?e.message:"Não foi possível carregar o modelo local.");}
  }
-
  async function send(value?:string){
   const text=(value??input).trim();if(!text||loading)return;
   if(!engineRef.current&&!cloudReady){setError("Primeiro carregue a IA local no botão acima. O modelo será baixado uma vez e ficará armazenado no navegador.");return;}
@@ -53,15 +55,14 @@ export default function Home() {
    let answer="";
    const append=(part:string)=>{answer+=part;patch(id,[...base,{role:"assistant",content:answer}]);};
    if(engineRef.current){
-    const stream=await engineRef.current.chat.completions.create({
-     messages:[{role:"system",content:SYSTEM},...base],
-     temperature:0.55,max_tokens:1100,stream:true
+    const {TextStreamer}=await import("@huggingface/transformers");
+    const streamer=new TextStreamer(engineRef.current.tokenizer as never,{
+     skip_prompt:true,skip_special_tokens:true,
+     callback_function:(token:string)=>{if(!cancelRef.current)append(token);}
     });
-    for await(const chunk of stream){
-     if(cancelRef.current){await engineRef.current.interruptGenerate();break;}
-     const token=chunk.choices[0]?.delta?.content;
-     if(typeof token==="string"&&token)append(token);
-    }
+    await engineRef.current([{role:"system",content:SYSTEM},...base],{
+     max_new_tokens:700,do_sample:false,streamer
+    });
    }else{
     const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json","Accept":"text/event-stream"},body:JSON.stringify({messages:base,systemInstruction:SYSTEM})});
     if(!res.ok){const data=await res.json().catch(()=>null);throw new Error(data?.error??`Falha HTTP ${res.status}.`);}
@@ -75,7 +76,7 @@ export default function Home() {
   }catch(e){setError(e instanceof Error?e.message:"Não foi possível gerar uma resposta.");const latest=items.find(x=>x.id===id)?.messages??pending;if(latest.at(-1)?.role==="assistant"&&!latest.at(-1)?.content)patch(id,latest.slice(0,-1));}
   finally{setLoading(false);area.current?.focus();}
  }
- const stop=()=>{cancelRef.current=true;if(engineRef.current)void engineRef.current.interruptGenerate();};
+ const stop=()=>{cancelRef.current=true;};
  const remove=(id:string)=>{const left=items.filter(x=>x.id!==id);setItems(left);if(id===activeId)setActiveId(left[0]?.id??"");};
  return <main className="studio-shell">
   <aside className={`studio-sidebar ${sidebar?"open":""}`}>
