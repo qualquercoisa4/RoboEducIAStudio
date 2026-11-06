@@ -386,7 +386,9 @@ async function callModel(
             : { max_tokens: maxTokens }),
         ...(!useOpenAI ? { temperature: 0.2, top_p: 0.85 } : {}),
         ...(useOpenRouter && useWebSearch ? { tools: [{ type: "openrouter:web_search" }] } : {}),
-        ...(useOpenRouter && structuredOutput ? { response_format: { type: "json_object" } } : {}),
+        ...((useOpenRouter || selectedModel === "cloudflare") && structuredOutput
+          ? { response_format: { type: "json_object" } }
+          : {}),
         stream: true
       };
   let upstream: Response;
