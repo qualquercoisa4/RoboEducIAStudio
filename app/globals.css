@@ -298,3 +298,12 @@ html:has(.studio-shell),body:has(.studio-shell){height:100%;overflow:hidden}
 .md-table td{color:#d2dceb}
 .md-table tr:last-child td{border-bottom:0}
 @media(max-width:600px){.markdown-message{font-size:13.5px}.md-code-block pre{padding:11px}.md-code-block pre code{font-size:11px}.md-h1{font-size:21px}.md-h2{font-size:19px}}
+
+
+/* Seletor de modelos para comparação */
+.model-picker{display:grid;grid-template-columns:auto minmax(180px,1fr);align-items:center;gap:5px 12px;margin:2px 0 9px;padding:0 3px}
+.model-picker label{font-size:8px;font-weight:900;letter-spacing:1.5px;color:#72839b}
+.model-picker select{min-width:0;max-width:100%;border:1px solid #34465f;border-radius:8px;background:#111d30;color:#e6edf7;padding:8px 10px;font-size:11px;font-weight:700;outline:none}
+.model-picker select:focus{border-color:#9cc765}
+.model-picker small{grid-column:2;color:#72839b;font-size:9px;line-height:1.35}
+@media(max-width:720px){.model-picker{grid-template-columns:1fr;gap:5px}.model-picker small{grid-column:1}.model-picker select{width:100%}}
