@@ -498,17 +498,62 @@ export async function POST(request: Request) {
       status("context", "Preparando o contexto e os requisitos da solicitação.");
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
 
-      const generationTimeout = runtimeRepair ? 46_000 : selectedModel.endsWith(":free") || selectedModel.startsWith("gemini:") ? 47_000 : mode === "deep" ? 36_000 : 42_000;
-      let answer = await callModel(accountId, apiToken, messages, runtimeRepair
+      const generationTimeout = runtimeRepair ? 40_000 : selectedModel.startsWith("gemini:") ? 24_000 : selectedModel.endsWith(":free") ? 30_000 : mode === "deep" ? 36_000 : 42_000;
+      const generationInstruction = runtimeRepair
         ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
-        : systemInstruction, maxTokens, signal, generationTimeout, selectedModel, Boolean(body.webSearch));
+        : systemInstruction;
+      let activeModel = selectedModel;
+      let answer = "";
+      try {
+        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, Boolean(body.webSearch));
+      } catch (primaryError) {
+        if (signal.aborted) throw primaryError;
+        const message = primaryError instanceof Error ? primaryError.message : String(primaryError);
+        const statusCode = (primaryError as Error & { status?: number }).status;
+        const temporaryFailure = statusCode === 408 || statusCode === 429 || statusCode === 500 || statusCode === 502 || statusCode === 503 || statusCode === 504 ||
+          /timeout|timed out|excedeu o tempo limite|temporariamente indisponível|sem capacidade|network|fetch failed/i.test(message);
+        if (!temporaryFailure) throw primaryError;
+
+        const fallbacks: string[] = [];
+        if (selectedModel !== "cloudflare" && accountId && apiToken) fallbacks.push("cloudflare");
+        if (selectedModel !== "google/gemma-4-31b-it:free" && process.env.OPENROUTER_API_KEY?.trim()) fallbacks.push("google/gemma-4-31b-it:free");
+        if (selectedModel !== "cohere/north-mini-code:free" && process.env.OPENROUTER_API_KEY?.trim()) fallbacks.push("cohere/north-mini-code:free");
+        if (selectedModel !== "recursive/flint-v1.0:free" && process.env.OPENROUTER_API_KEY?.trim()) fallbacks.push("recursive/flint-v1.0:free");
+
+        let fallbackError: unknown = primaryError;
+        for (const fallbackModel of fallbacks) {
+          if (signal.aborted) throw fallbackError;
+          const fallbackName = fallbackModel === "cloudflare" ? "Cloudflare Workers AI" : fallbackModel.split("/").pop()?.replace(":free", "") || "OpenRouter";
+          status("fallback", selectedModel.startsWith("gemini:")
+            ? "Gemini está instável. Tentando automaticamente " + fallbackName + " para não interromper a resposta."
+            : "O provedor principal falhou. Tentando automaticamente " + fallbackName + ".");
+          try {
+            activeModel = fallbackModel;
+            answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal,
+              fallbackModel === "cloudflare" ? 38_000 : 30_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare");
+            if (answer.trim()) {
+              status("fallback-success", "Resposta recuperada automaticamente por " + fallbackName + ".");
+              break;
+            }
+            throw new Error(fallbackName + " encerrou a geração sem retornar texto.");
+          } catch (nextError) {
+            if (signal.aborted) throw nextError;
+            fallbackError = nextError;
+            activeModel = selectedModel;
+          }
+        }
+        if (!answer.trim()) {
+          const finalMessage = fallbackError instanceof Error ? fallbackError.message : message;
+          throw new Error("O provedor principal falhou (" + message + "). As alternativas configuradas também não responderam. Último erro: " + finalMessage);
+        }
+      }
       if (!answer.trim()) throw new Error("O modelo encerrou a geração sem retornar texto. Tente novamente.");
 
       if (isLikelyCodeTask(messages, answer)) {
         status("review", "Verificando integridade dos blocos, sintaxe e sinais de código incompleto.");
         const findings = inspectCode(answer);
 
-        if (mode === "deep" && !runtimeRepair && selectedModel === "cloudflare") {
+        if (mode === "deep" && !runtimeRepair && activeModel === "cloudflare") {
           status("audit", "Executando uma auditoria adicional de lógica e integração do código.");
           try {
             const audit = await callModel(
@@ -549,7 +594,7 @@ export async function POST(request: Request) {
           try {
             const repaired = await callModel(accountId, apiToken, repairMessages,
               systemInstruction + "\\n\\nCORREÇÃO OBJETIVA: preserve o código e corrija somente os problemas apontados. Retorne o arquivo completo, sem auditoria adicional.",
-              repairTokens, signal, 9_000, selectedModel);
+              repairTokens, signal, 9_000, activeModel);
             if (repaired.trim()) {
               const remainingIssues = inspectCode(repaired);
               if (remainingIssues.length) {
