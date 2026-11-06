@@ -66,8 +66,12 @@ export function validateProjectFiles(input: unknown): WorkspaceFileSnapshot[] {
 
 function extractWorkspaceJson(raw: string): string {
   const value = raw.trim();
-  const fenced = value.match(/^\x60{3}(?:json)?\s*([\s\S]*?)\s*\x60{3}$/i);
+  const fence = String.fromCharCode(96).repeat(3);
+  const fenced = value.match(/^\\x60{3}(?:json)?\\s*([\\s\\S]*?)\\s*\\x60{3}$/i);
   if (fenced) return fenced[1].trim();
+  if (value.startsWith(fence)) {
+    throw new Error("O manifesto foi retornado com um bloco Markdown incompleto.");
+  }
 
   // Accept a JSON object surrounded by harmless prose, while scanning braces
   // safely so braces inside strings do not terminate the object early.
