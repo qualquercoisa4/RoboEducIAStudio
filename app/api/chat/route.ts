@@ -156,6 +156,7 @@ function extractResponse(payload: unknown): string {
     response?: unknown;
     result?: { response?: unknown };
     choices?: Array<{ delta?: { content?: unknown }; message?: { content?: unknown } }>;
+    candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
     delta?: { response?: unknown };
   };
   const candidates = [
@@ -163,6 +164,7 @@ function extractResponse(payload: unknown): string {
     data.result?.response,
     data.choices?.[0]?.delta?.content,
     data.choices?.[0]?.message?.content,
+    data.candidates?.[0]?.content?.parts?.map(part => typeof part.text === "string" ? part.text : "").join(""),
     data.delta?.response
   ];
   return candidates.find((value): value is string => typeof value === "string") ?? "";
@@ -360,34 +362,45 @@ async function callModel(
   useWebSearch = false
 ): Promise<string> {
   const useOpenAI = selectedModel === "openai:gpt-5.6-luna";
-  const useOpenRouter = selectedModel !== "cloudflare" && !useOpenAI;
-  const providerName = useOpenAI ? "OpenAI" : useOpenRouter ? "OpenRouter" : "Cloudflare Workers AI";
+  const useGemini = selectedModel.startsWith("gemini:");
+  const useOpenRouter = selectedModel !== "cloudflare" && !useOpenAI && !useGemini;
+  const providerName = useGemini ? "Gemini" : useOpenAI ? "OpenAI" : useOpenRouter ? "OpenRouter" : "Cloudflare Workers AI";
   const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
   const openAIKey = process.env.OPENAI_API_KEY?.trim();
-  const selectedKey = useOpenAI ? openAIKey : useOpenRouter ? openRouterKey : apiToken;
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  const selectedKey = useGemini ? geminiKey : useOpenAI ? openAIKey : useOpenRouter ? openRouterKey : apiToken;
   if (!selectedKey) throw new Error("A chave de API do provedor " + providerName + " não está configurada na Vercel.");
-  if (!useOpenRouter && !useOpenAI && !accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID não está configurado na Vercel.");
-  const endpoint = useOpenAI
-    ? "https://api.openai.com/v1/chat/completions"
-    : useOpenRouter
-      ? "https://openrouter.ai/api/v1/chat/completions"
-      : "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/run/" + MODEL;
-  const requestBody = {
-    messages: [{ role: "system", content: systemInstruction }, ...messages],
-    ...(useOpenAI
-      ? { model: "gpt-5.6-luna", max_completion_tokens: maxTokens }
+  if (!useOpenRouter && !useOpenAI && !useGemini && !accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID não está configurado na Vercel.");
+  const geminiModel = useGemini ? selectedModel.slice("gemini:".length) : "";
+  const endpoint = useGemini
+    ? "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(geminiModel) + ":streamGenerateContent?alt=sse"
+    : useOpenAI
+      ? "https://api.openai.com/v1/chat/completions"
       : useOpenRouter
-        ? { model: selectedModel, max_tokens: maxTokens }
-        : { max_tokens: maxTokens }),
-    ...(!useOpenAI ? { temperature: 0.2, top_p: 0.85 } : {}),
-    ...(useOpenRouter && useWebSearch ? { tools: [{ type: "openrouter:web_search" }] } : {}),
-    stream: true
-  };
+        ? "https://openrouter.ai/api/v1/chat/completions"
+        : "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/run/" + MODEL;
+  const requestBody = useGemini
+    ? {
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: messages.map(message => ({ role: message.role === "assistant" ? "model" : "user", parts: [{ text: message.content }] })),
+        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.2, topP: 0.85 }
+      }
+    : {
+        messages: [{ role: "system", content: systemInstruction }, ...messages],
+        ...(useOpenAI
+          ? { model: "gpt-5.6-luna", max_completion_tokens: maxTokens }
+          : useOpenRouter
+            ? { model: selectedModel, max_tokens: maxTokens }
+            : { max_tokens: maxTokens }),
+        ...(!useOpenAI ? { temperature: 0.2, top_p: 0.85 } : {}),
+        ...(useOpenRouter && useWebSearch ? { tools: [{ type: "openrouter:web_search" }] } : {}),
+        stream: true
+      };
   let upstream: Response;
   try {
     upstream = await fetch(endpoint, {
       method: "POST",
-      headers: { Authorization: "Bearer " + selectedKey, "Content-Type": "application/json", Accept: "text/event-stream" },
+      headers: { ...(useGemini ? { "x-goog-api-key": selectedKey } : { Authorization: "Bearer " + selectedKey }), "Content-Type": "application/json", Accept: "text/event-stream" },
       body: JSON.stringify(requestBody),
       cache: "no-store",
       signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
@@ -439,15 +452,18 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json() as { messages?: ChatMessage[]; systemInstruction?: string; mode?: WorkMode; model?: string; webSearch?: boolean };
-    const allowedModels = ["cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free", "openai:gpt-5.6-luna"];
+    const allowedModels = ["cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free", "openai:gpt-5.6-luna", "gemini:gemini-3.8-flash"];
     const selectedModel = typeof body.model === "string" && allowedModels.includes(body.model) ? body.model : "cloudflare";
     if (selectedModel === "cloudflare" && (!accountId || !apiToken)) {
       return NextResponse.json({ error: "Para usar Cloudflare, configure CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN na Vercel." }, { status: 503 });
     }
+    if (selectedModel === "gemini:gemini-3.8-flash" && !process.env.GEMINI_API_KEY?.trim()) {
+      return NextResponse.json({ error: "Para usar Gemini 3.8 Flash, configure GEMINI_API_KEY nas variáveis de ambiente da Vercel." }, { status: 503 });
+    }
     if (selectedModel === "openai:gpt-5.6-luna" && !process.env.OPENAI_API_KEY?.trim()) {
       return NextResponse.json({ error: "Para usar GPT-5.6 Luna, configure OPENAI_API_KEY na Vercel. A cobrança é feita por tokens na conta da OpenAI." }, { status: 503 });
     }
-    if (selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !process.env.OPENROUTER_API_KEY?.trim()) {
+    if (selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:") && !process.env.OPENROUTER_API_KEY?.trim()) {
       return NextResponse.json({ error: "Para usar modelos OpenRouter, cadastre OPENROUTER_API_KEY nas variáveis de ambiente da Vercel." }, { status: 503 });
     }
     if (!Array.isArray(body.messages) || body.messages.length === 0) {
@@ -482,7 +498,7 @@ export async function POST(request: Request) {
       status("context", "Preparando o contexto e os requisitos da solicitação.");
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
 
-      const generationTimeout = runtimeRepair ? 46_000 : selectedModel.endsWith(":free") ? 47_000 : mode === "deep" ? 36_000 : 42_000;
+      const generationTimeout = runtimeRepair ? 46_000 : selectedModel.endsWith(":free") || selectedModel.startsWith("gemini:") ? 47_000 : mode === "deep" ? 36_000 : 42_000;
       let answer = await callModel(accountId, apiToken, messages, runtimeRepair
         ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
         : systemInstruction, maxTokens, signal, generationTimeout, selectedModel, Boolean(body.webSearch));
