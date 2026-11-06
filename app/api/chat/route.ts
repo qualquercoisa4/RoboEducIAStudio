@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import ts from "typescript";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type WorkMode = "fast" | "complete" | "deep";
@@ -170,7 +170,7 @@ function extractResponse(payload: unknown): string {
   return candidates.find((value): value is string => typeof value === "string") ?? "";
 }
 
-async function readCloudflareStream(response: Response): Promise<string> {
+async function readCloudflareStream(response: Response, onToken?: (chunk: string) => void): Promise<string> {
   if (!response.body) throw new Error("A API não retornou um fluxo de resposta.");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -184,7 +184,11 @@ async function readCloudflareStream(response: Response): Promise<string> {
       if (!raw || raw === "[DONE]") continue;
       try {
         const parsed = JSON.parse(raw) as unknown;
-        answer += extractResponse(parsed);
+        const chunk = extractResponse(parsed);
+        if (chunk) {
+          answer += chunk;
+          onToken?.(chunk);
+        }
         if (parsed && typeof parsed === "object" && "error" in parsed) {
           throw new Error(String((parsed as { error: unknown }).error));
         }
@@ -359,7 +363,8 @@ async function callModel(
   signal: AbortSignal,
   timeoutMs = 40_000,
   selectedModel = "cloudflare",
-  useWebSearch = false
+  useWebSearch = false,
+  onToken?: (chunk: string) => void
 ): Promise<string> {
   const useOpenAI = selectedModel === "openai:gpt-5.6-luna";
   const useGemini = selectedModel.startsWith("gemini:");
@@ -433,7 +438,7 @@ async function callModel(
     throw error;
   }
   try {
-    return await readCloudflareStream(upstream);
+    return await readCloudflareStream(upstream, onToken);
   } catch (error) {
     if (signal.aborted) throw error;
     if (error instanceof Error && (error.name === "TimeoutError" || /timeout|timed out|aborted/i.test(error.message))) {
@@ -499,14 +504,14 @@ export async function POST(request: Request) {
       status("context", "Preparando o contexto e os requisitos da solicitação.");
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
 
-      const generationTimeout = runtimeRepair ? 40_000 : selectedModel.startsWith("gemini:") ? 24_000 : selectedModel.endsWith(":free") ? 30_000 : mode === "deep" ? 36_000 : 42_000;
+      const generationTimeout = runtimeRepair ? 90_000 : selectedModel.endsWith(":free") ? 90_000 : selectedModel.startsWith("gemini:") ? 120_000 : 150_000;
       const generationInstruction = runtimeRepair
         ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
         : systemInstruction;
       let activeModel = selectedModel;
       let answer = "";
       try {
-        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, Boolean(body.webSearch));
+        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, Boolean(body.webSearch), chunk => send({ type: "token", response: chunk }));
       } catch (primaryError) {
         if (signal.aborted) throw primaryError;
         const message = primaryError instanceof Error ? primaryError.message : String(primaryError);
@@ -515,6 +520,7 @@ export async function POST(request: Request) {
           /timeout|timed out|excedeu o tempo limite|temporariamente indisponível|sem capacidade|network|fetch failed/i.test(message);
         if (!temporaryFailure) throw primaryError;
 
+        send({ type: "reset" });
         const fallbacks: string[] = [];
         if (selectedModel !== "cloudflare" && accountId && apiToken) fallbacks.push("cloudflare");
         if (selectedModel !== "google/gemma-4-31b-it:free" && process.env.OPENROUTER_API_KEY?.trim()) fallbacks.push("google/gemma-4-31b-it:free");
@@ -531,7 +537,7 @@ export async function POST(request: Request) {
           try {
             activeModel = fallbackModel;
             answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal,
-              fallbackModel === "cloudflare" ? 38_000 : 30_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare");
+              fallbackModel === "cloudflare" ? 90_000 : 75_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }));
             if (answer.trim()) {
               status("fallback-success", "Resposta recuperada automaticamente por " + fallbackName + ".");
               break;
@@ -591,9 +597,10 @@ export async function POST(request: Request) {
             }
           ];
           try {
+            send({ type: "reset" });
             const repaired = await callModel(accountId, apiToken, repairMessages,
               systemInstruction + "\\n\\nCORREÇÃO OBJETIVA: preserve o código e corrija somente os problemas apontados. Retorne o arquivo completo, sem auditoria adicional.",
-              repairTokens, signal, 9_000, activeModel);
+              repairTokens, signal, 90_000, activeModel, false, chunk => send({ type: "token", response: chunk }));
             if (repaired.trim()) {
               const remainingIssues = inspectCode(repaired);
               if (remainingIssues.length) {
@@ -622,11 +629,6 @@ export async function POST(request: Request) {
       }
 
       status("delivery", "Preparando a resposta final.");
-      const chunks = answer.match(/[\s\S]{1,96}/g) ?? [answer];
-      for (const chunk of chunks) {
-        if (signal.aborted) return;
-        send({ type: "token", response: chunk });
-      }
       send({ type: "done" });
     }, request.signal);
   } catch (error) {
