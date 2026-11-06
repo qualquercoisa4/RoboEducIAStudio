@@ -14,10 +14,10 @@ type Answers = {
 };
 
 const styles: Choice[] = [
-  { id: "Minecraft", title: "Mundo de blocos", description: "Construção, exploração e sobrevivência", art: "🧱", tone: "mint" },
-  { id: "Roblox", title: "Aventura 3D", description: "Personagens, obby e mundos variados", art: "🧍", tone: "blue" },
-  { id: "Fortnite", title: "Ação e batalha", description: "Missões, arenas e competição", art: "🎯", tone: "purple" },
-  { id: "Sonic", title: "Plataforma veloz", description: "Corridas, saltos e fases coloridas", art: "💨", tone: "yellow" },
+  { id: "Minecraft", title: "Minecraft", description: "Blocos, construção e sobrevivência", art: "🧱", tone: "mint" },
+  { id: "Roblox", title: "Roblox", description: "Obbys, avatares e mundos 3D", art: "🧍", tone: "blue" },
+  { id: "Fortnite", title: "Fortnite", description: "Ação, arenas e desafios", art: "🎯", tone: "purple" },
+  { id: "Sonic", title: "Sonic", description: "Velocidade, saltos e fases", art: "💨", tone: "yellow" },
   { id: "Corrida", title: "Corrida", description: "Veículos, pistas e desafios", art: "🏎️", tone: "orange" },
   { id: "Meu próprio estilo", title: "Inventar um estilo", description: "Criar algo totalmente diferente", art: "✨", tone: "pink" },
 ];
@@ -67,7 +67,7 @@ export default function Home() {
       "Nome provisório: " + (answers.name.trim() || "Pode sugerir um nome"),
       "Ideias extras da criança: " + (answers.extra.trim() || "Nenhuma"),
     ].join("\n");
-    const systemInstruction = `Você é um designer de jogos educativos que transforma ideias de crianças em instruções excelentes para outra IA programadora. Escreva em português brasileiro, com linguagem clara e objetiva. Sua tarefa é produzir UM PROMPT DE DESENVOLVIMENTO completo, de tamanho médio (aproximadamente 350 a 550 palavras), pronto para copiar e enviar a outra IA. O prompt deve pedir a criação de um jogo REAL em um único arquivo HTML, com CSS e JavaScript embutidos, que funcione ao abrir no navegador, sem frameworks, sem instalação e sem assets externos obrigatórios. Deve especificar gameplay coerente com as escolhas, controles de teclado e toque quando aplicável, objetivo e condição de vitória, interface legível, feedback visual/sonoro opcional, progressão, colisões/física quando necessárias, tela inicial, pausa/reinício e adaptação para celular e computador. A referência a jogos famosos serve apenas para descrever gênero e sensação; não copie personagens, marcas, mapas, músicas ou assets protegidos. Não misture gêneros incompatíveis: respeite a referência selecionada e adapte o objetivo a ela de maneira consistente. Se o tema for robótica ou aprendizagem, integre isso às mecânicas do jogo, não apenas à história. Não inclua explicações sobre o seu processo, nem introdução, nem Markdown em volta: entregue somente o prompt final, em texto simples, com seções curtas e requisitos verificáveis. Não invente multiplayer online ou recursos de servidor.`;
+    const systemInstruction = `Você é um designer de jogos educativos que transforma ideias de crianças em instruções excelentes para outra IA programadora. Escreva em português brasileiro, com linguagem clara e objetiva. Sua tarefa é produzir UM PROMPT DE DESENVOLVIMENTO completo, de tamanho médio (aproximadamente 280 a 420 palavras), pronto para copiar e enviar a outra IA. O prompt deve pedir a criação de um jogo REAL em um único arquivo HTML, com CSS e JavaScript embutidos, que funcione ao abrir no navegador, sem frameworks, sem instalação e sem assets externos obrigatórios. Deve especificar gameplay coerente com as escolhas, controles de teclado e toque quando aplicável, objetivo e condição de vitória, interface legível, feedback visual/sonoro opcional, progressão, colisões/física quando necessárias, tela inicial, pausa/reinício e adaptação para celular e computador. A referência a jogos famosos serve apenas para descrever gênero e sensação; não copie personagens, marcas, mapas, músicas ou assets protegidos. Não misture gêneros incompatíveis: respeite a referência selecionada e adapte o objetivo a ela de maneira consistente. Se o tema for robótica ou aprendizagem, integre isso às mecânicas do jogo, não apenas à história. Não inclua explicações sobre o seu processo, nem introdução, nem Markdown em volta: entregue somente o prompt final, em texto simples, com seções curtas e requisitos verificáveis. Não invente multiplayer online ou recursos de servidor.`;
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
