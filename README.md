@@ -26,7 +26,7 @@ O Workspace em `/workspace` envia o snapshot do projeto e as operações planeja
 
 ## Game Studio
 
-Acesse `/studio` para usar o criador de jogos. O projeto também inclui o jogo de sobrevivência voxel em `/games`.
+Acesse `/studio` para usar o criador de jogos. O projeto também inclui o componente de sobrevivência voxel `MinecraftSurvival`, integrado ao Game Studio.
 
 ## Desenvolvimento local
 
