@@ -299,10 +299,10 @@ export default function Home() {
         <div className="composer-area">
           <div className="local-ai-panel">
             <div>
-              <b>{cloudReady ? "IA hospedada na nuvem" : "Configuração da IA na nuvem pendente"}</b>
-              <small>{cloudReady ? "Geração adaptativa, revisão estática e executor HTML isolado." : "O chat está pronto para Cloudflare Workers AI, mas faltam as credenciais no servidor."}</small>
+              <b>{cloudReady ? "Infraestrutura de IA configurada" : "Configuração da IA pendente"}</b>
+              <small>{cloudReady ? "Alternância automática entre provedores quando houver instabilidade temporária." : "Configure um provedor de IA na Vercel para habilitar as respostas."}</small>
             </div>
-            <span>{cloudReady ? "CONECTADA" : "AGUARDANDO"}</span>
+            <span>{cloudReady ? "PRONTA" : "AGUARDANDO"}</span>
           </div>
           {error && <div className="error-banner">{error}<button onClick={() => setError("")}>Fechar</button></div>}
           <div className="model-picker" aria-label="Modelo de inteligência artificial">
