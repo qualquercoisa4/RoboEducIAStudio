@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import HtmlCodeRunner from "./components/HtmlCodeRunner";
 import MarkdownMessage from "./components/MarkdownMessage";
@@ -38,7 +38,7 @@ export default function Home() {
   const area = useRef<HTMLTextAreaElement>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const active = items.find(item => item.id === activeId);
-  const messages = active?.messages ?? [];
+  const messages = useMemo(() => active?.messages ?? [], [active]);
   const selectedProviderReady = selectedModel === "cloudflare" ? cloudReady : selectedModel === "openai:gpt-5.6-luna" ? openAIReady : selectedModel.startsWith("gemini:") ? geminiReady : openRouterReady;
 
   useEffect(() => {
