@@ -62,7 +62,6 @@ function makeSandboxDocument(code: string) {
 export default function HtmlCodeRunner({ content, onAskFix }: Props) {
   const code = useMemo(() => extractHtml(content), [content]);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState(0);
   const [status, setStatus] = useState("Pronto para executar");
   const [errors, setErrors] = useState<string[]>([]);
@@ -70,7 +69,6 @@ export default function HtmlCodeRunner({ content, onAskFix }: Props) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!running) return;
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow) return;
       const data = event.data as { __roboeducRunner?: boolean; type?: string; message?: string };
@@ -84,7 +82,7 @@ export default function HtmlCodeRunner({ content, onAskFix }: Props) {
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [running, runId]);
+  }, []);
 
   if (!code) return null;
 
@@ -92,7 +90,6 @@ export default function HtmlCodeRunner({ content, onAskFix }: Props) {
     setErrors([]);
     setStatus("Iniciando ambiente isolado...");
     setShowPreview(true);
-    setRunning(true);
     setRunId(value => value + 1);
   };
 
