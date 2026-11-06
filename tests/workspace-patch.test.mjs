@@ -39,6 +39,19 @@ test("aceita exclusão apenas de arquivo existente", () => {
 test("aceita manifesto sem alterações", () => {
   assert.deepEqual(parseWorkspacePlan(JSON.stringify({ summary: "Sem mudanças", operations: [] }), files).operations, []);
 });
+test("extrai manifesto JSON de texto introdutório e texto final", () => {
+  const json = JSON.stringify({ summary: "Quadrado arrastável", operations: [
+    { path: "src/main.js", action: "update", reason: "Implementar interação por toque" }
+  ] });
+  const plan = parseWorkspacePlan("Plano solicitado:\\n" + json + "\\nConcluído.", files);
+  assert.equal(plan.summary, "Quadrado arrastável");
+  assert.equal(plan.operations[0].path, "src/main.js");
+});
+test("extrai manifesto JSON de cerca Markdown mesmo com espaços", () => {
+  const fence = String.fromCharCode(96).repeat(3);
+  const json = JSON.stringify({ summary: "Plano", operations: [] });
+  assert.equal(parseWorkspacePlan("  " + fence + "json\\n" + json + "\\n" + fence + "  ", files).summary, "Plano");
+});
 test("rejeita JSON inválido, arrays e campos obrigatórios ausentes", () => {
   assert.throws(() => parseWorkspacePlan("{", files));
   assert.throws(() => parseWorkspacePlan("[]", files));

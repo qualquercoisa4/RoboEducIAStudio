@@ -64,19 +64,39 @@ export function validateProjectFiles(input: unknown): WorkspaceFileSnapshot[] {
   return files;
 }
 
-function removeOuterJsonFence(raw: string): string {
+function extractWorkspaceJson(raw: string): string {
   const value = raw.trim();
   const fence = String.fromCharCode(96).repeat(3);
-  if (!value.startsWith(fence)) return value;
-  const firstLineEnd = value.indexOf("\n");
-  if (firstLineEnd < 0 || !value.endsWith(fence)) {
-    throw new Error("O manifesto foi retornado com um bloco Markdown incompleto.");
+  const fenced = value.match(/^\x60{3}(?:json)?\s*([\s\S]*?)\s*\x60{3}$/i);
+  if (fenced) return fenced[1].trim();
+
+  // Accept a JSON object surrounded by harmless prose, while scanning braces
+  // safely so braces inside strings do not terminate the object early.
+  const start = value.indexOf("{");
+  if (start < 0) return value;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') { inString = true; continue; }
+    if (char === "{") depth += 1;
+    else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return value.slice(start, index + 1);
+    }
   }
-  return value.slice(firstLineEnd + 1, -3).trim();
+  return value;
 }
 
 export function parseWorkspacePlan(raw: string, files: WorkspaceFileSnapshot[]): WorkspacePlan {
-  const serialized = removeOuterJsonFence(raw);
+  const serialized = extractWorkspaceJson(raw);
   let parsed: unknown;
   try {
     parsed = JSON.parse(serialized);

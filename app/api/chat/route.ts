@@ -671,14 +671,39 @@ async function executeWorkspaceEdit(args: {
   try {
     plan = parseWorkspacePlan(rawPlan, projectFiles);
   } catch (firstError) {
-    status("plan-retry", "O manifesto não passou na validação. Solicitando uma nova versão curta; nenhum arquivo foi alterado.");
+    const firstMessage = firstError instanceof Error ? firstError.message : "formato inválido";
     const retryMessages: ChatMessage[] = [
       ...plannerMessages,
       { role: "assistant", content: rawPlan },
-      { role: "user", content: "O manifesto anterior não passou na validação: " + (firstError instanceof Error ? firstError.message : "formato inválido") + ". Retorne novamente somente o objeto JSON no esquema exato. Não gere código nem explicações." }
+      { role: "user", content:
+        "O manifesto anterior foi rejeitado pelo validador: " + firstMessage + ". " +
+        "Retorne somente um objeto JSON puro, sem Markdown, sem cercas de código e sem texto antes ou depois. " +
+        "Use exatamente as chaves summary e operations. Cada operação deve conter path, action e reason. " +
+        "Não gere código nem explicações."
+      }
     ];
-    rawPlan = await callWorkspaceModel(accountId, apiToken, retryMessages, WORKSPACE_PLAN_SYSTEM, 2_048, signal, selectedModel, true);
-    plan = parseWorkspacePlan(rawPlan, projectFiles);
+
+    // Cloudflare's selected model does not support JSON mode here. If it emits
+    // malformed JSON, use only the explicitly free OpenRouter model for recovery.
+    const recoveryModel = selectedModel === "cloudflare" && process.env.OPENROUTER_API_KEY?.trim()
+      ? "google/gemma-4-31b-it:free"
+      : selectedModel;
+    if (recoveryModel !== selectedModel) {
+      status("plan-fallback", "O manifesto do Cloudflare veio em formato inválido. Tentando recuperar o plano com um modelo gratuito; nenhum arquivo foi alterado.");
+    } else {
+      status("plan-retry", "O manifesto não passou na validação. Solicitando uma nova versão curta; nenhum arquivo foi alterado.");
+    }
+    rawPlan = await callWorkspaceModel(
+      accountId, apiToken, retryMessages, WORKSPACE_PLAN_SYSTEM, 3_072, signal, recoveryModel, true,
+      undefined,
+      model => status("fallback", "O provedor de recuperação está instável. Tentando " + model + ".")
+    );
+    try {
+      plan = parseWorkspacePlan(rawPlan, projectFiles);
+    } catch (secondError) {
+      const detail = secondError instanceof Error ? secondError.message : "formato inválido";
+      throw new Error("Não foi possível obter um manifesto válido após a recuperação. Nenhum arquivo foi alterado. Detalhe: " + detail);
+    }
   }
 
   send({ type: "plan", summary: plan.summary, operations: plan.operations });
