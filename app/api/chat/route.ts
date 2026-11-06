@@ -103,11 +103,23 @@ export async function POST(request: Request) {
           ...messages
         ],
         max_tokens: MAX_OUTPUT_TOKENS,
-        temperature: 0.2
+        temperature: 0.2,
+        stream: true
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(55_000)
     });
+
+    if (!upstream.ok) {
+      const failure = await upstream.json().catch(() => null) as { errors?: Array<{ message?: string }>; messages?: Array<{ message?: string }> } | null;
+      const detail = failure?.errors?.map((item) => item.message).filter(Boolean).join("; ") ||
+        failure?.messages?.map((item) => item.message).filter(Boolean).join("; ") ||
+        `Cloudflare retornou HTTP ${upstream.status}.`;
+      console.error("Cloudflare Workers AI error:", upstream.status, detail);
+      return NextResponse.json({ error: upstream.status === 401 ? "Token Cloudflare inválido ou sem permissão Workers AI - Read." : upstream.status === 429 ? "Limite de uso da IA atingido. Tente novamente mais tarde." : detail }, { status: upstream.status === 429 ? 429 : 502 });
+    }
+    if (!upstream.body) return NextResponse.json({ error: "A API não retornou um fluxo de resposta." }, { status: 502 });
+    return new Response(upstream.body, { status: 200, headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no" } });
 
     const payload = await upstream.json().catch(() => null) as {
       success?: boolean;
