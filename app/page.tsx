@@ -144,7 +144,10 @@ export default function Home() {
           } catch {
             continue;
           }
-          if (data.type === "status") {
+          if (data.type === "reset") {
+            answer = "";
+            patch(id, [...base, { role: "assistant", content: "" }]);
+          } else if (data.type === "status") {
             const detail = data.detail || data.stage || "Processando";
             setProcessSteps(previous => previous.at(-1) === detail ? previous : [...previous, detail].slice(-6));
           } else if (data.type === "error" || data.error) {
