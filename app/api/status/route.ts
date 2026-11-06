@@ -15,5 +15,5 @@ export async function GET() {
     provider: "Cloudflare Workers AI",
     model: process.env.CLOUDFLARE_MODEL?.trim() || "@cf/qwen/qwen3-30b-a3b-fp8",
     message: configured ? "Credenciais configuradas. A conexão será validada na primeira mensagem." : "Cadastre CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN nas variáveis de ambiente da Vercel."
-  });
+  }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
 }
