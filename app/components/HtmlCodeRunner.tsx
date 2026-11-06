@@ -31,16 +31,16 @@ function extractHtml(content: string): string | null {
 }
 
 function makeSandboxDocument(code: string) {
-  const policy = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src \'none\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'; frame-src \'none\'">';
+  const policy = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://threejs.org; style-src \'unsafe-inline\' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src data: blob: https:; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; media-src data: blob: https://; connect-src https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://threejs.org https://raw.githubusercontent.com; object-src \'none\'; base-uri \'none\'; form-action \'none\'; frame-src \'none\'">';
   const bridge = [
     "<script>",
     "(() => {",
     "  const send = (type, message) => { try { parent.postMessage({ __roboeducRunner: true, type, message: String(message ?? '') }, '*'); } catch {} };",
-    "  window.addEventListener('error', (event) => send('error', (event.message || 'Erro JavaScript') + (event.lineno ? ' — linha ' + event.lineno : '')));",
+    "  window.addEventListener('error', (event) => { const target = event.target; const resource = target && (target.src || target.href); send('error', resource ? 'Falha ao carregar recurso: ' + resource : (event.message || 'Erro JavaScript') + (event.lineno ? ' — linha ' + event.lineno : '')); }, true);",
     "  window.addEventListener('unhandledrejection', (event) => send('error', event.reason && (event.reason.stack || event.reason.message) || event.reason || 'Promise rejeitada'));",
     "  const originalError = console.error.bind(console);",
     "  console.error = (...args) => { send('console', args.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' ')); originalError(...args); };",
-    "  window.addEventListener('load', () => send('ready', 'Execução iniciada'));",
+    "  window.addEventListener('load', () => send('ready', 'Execução iniciada; bibliotecas externas permitidas podem ser utilizadas'));",
     "})();",
     "</script>"
   ].join("");
@@ -134,7 +134,7 @@ export default function HtmlCodeRunner({ content, onAskFix }: Props) {
             srcDoc={makeSandboxDocument(code)}
           />
           <div className="runner-security-note">
-            O ambiente bloqueia acesso à página principal, cookies, armazenamento, formulários e conexões externas. Recursos externos podem não carregar.
+            Isolamento ativo: o código não acessa a página principal, cookies ou armazenamento do site. Bibliotecas e recursos HTTPS são permitidos somente nos domínios listados na política de segurança.
           </div>
           {errors.length > 0 && (
             <div className="runner-errors">
