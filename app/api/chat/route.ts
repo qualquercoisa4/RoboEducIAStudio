@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import ts from "typescript";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 60; // Mantido dentro do limite de execução do projeto.
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type CloudflareError = { errors?: Array<{ message?: string }>; messages?: Array<{ message?: string }> };
 const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
 const MAX_MESSAGES = 16;
 const MAX_MESSAGE_LENGTH = 12000;
-const MAX_OUTPUT_TOKENS = 1600;
-const MAX_REPAIR_TOKENS = 1800;
+const MAX_OUTPUT_TOKENS = 4096; // Permite respostas longas, como jogos completos em um arquivo.
+const MAX_REPAIR_TOKENS = 3072;
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 const QUALITY_RULES = `
@@ -158,7 +158,7 @@ function toEventStream(text: string) {
   });
 }
 
-async function callModel(accountId: string, apiToken: string, messages: ChatMessage[], systemInstruction: string, maxTokens: number): Promise<string> {
+async function callModel(accountId: string, apiToken: string, messages: ChatMessage[], systemInstruction: string, maxTokens: number, timeoutMs = 42_000): Promise<string> {
   const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${MODEL}`;
   const upstream = await fetch(endpoint, {
     method: "POST",
@@ -170,7 +170,7 @@ async function callModel(accountId: string, apiToken: string, messages: ChatMess
       stream: true
     }),
     cache: "no-store",
-    signal: AbortSignal.timeout(55_000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
 
   if (!upstream.ok) {
@@ -238,7 +238,7 @@ export async function POST(request: Request) {
           content: `REVISE E CORRIJA a resposta anterior antes de entregá-la. A revisão automática encontrou: ${issues.join(", ")}. Reescreva a resposta completa, preservando o objetivo original. Corrija todos os erros, preencha todos os valores e argumentos, e entregue o código completo. Não explique a auditoria; apresente a versão corrigida.`
         }
       ];
-      const repaired = await callModel(accountId, apiToken, repairMessages, systemInstruction, MAX_REPAIR_TOKENS);
+      const repaired = await callModel(accountId, apiToken, repairMessages, systemInstruction, MAX_REPAIR_TOKENS, 15_000);
       if (repaired.trim()) {
         const remainingIssues = inspectCode(repaired);
         if (remainingIssues.length) {
