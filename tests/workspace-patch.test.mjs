@@ -69,8 +69,12 @@ test("rejeita ação desconhecida, duplicatas e arquivo ausente", () => {
   ];
   for (const operations of invalid) assert.throws(() => parseWorkspacePlan(JSON.stringify({ summary: "Teste", operations }), files));
 });
-test("limita manifesto a quatro operações", () => {
-  const operations = Array.from({ length: 5 }, (_, i) => ({ path: "new-" + i + ".js", action: "create", reason: "teste" }));
+test("aceita até doze operações em uma edição de projeto", () => {
+  const operations = Array.from({ length: 12 }, (_, i) => ({ path: "new-" + i + ".js", action: "create", reason: "teste" }));
+  assert.equal(parseWorkspacePlan(JSON.stringify({ summary: "Projeto amplo", operations }), files).operations.length, 12);
+});
+test("rejeita manifesto acima de doze operações", () => {
+  const operations = Array.from({ length: 13 }, (_, i) => ({ path: "new-" + i + ".js", action: "create", reason: "teste" }));
   assert.throws(() => parseWorkspacePlan(JSON.stringify({ summary: "Muitas", operations }), files));
 });
 test("aceita cerca Markdown completa e rejeita cerca truncada", () => {
