@@ -504,7 +504,7 @@ export async function POST(request: Request) {
       status("context", "Preparando o contexto e os requisitos da solicitação.");
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
 
-      const generationTimeout = runtimeRepair ? 90_000 : selectedModel.endsWith(":free") ? 90_000 : selectedModel.startsWith("gemini:") ? 120_000 : 150_000;
+      const generationTimeout = runtimeRepair ? 60_000 : selectedModel.endsWith(":free") ? 90_000 : selectedModel.startsWith("gemini:") ? 120_000 : 120_000;
       const generationInstruction = runtimeRepair
         ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
         : systemInstruction;
@@ -537,7 +537,7 @@ export async function POST(request: Request) {
           try {
             activeModel = fallbackModel;
             answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal,
-              fallbackModel === "cloudflare" ? 90_000 : 75_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }));
+              fallbackModel === "cloudflare" ? 30_000 : 30_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }));
             if (answer.trim()) {
               status("fallback-success", "Resposta recuperada automaticamente por " + fallbackName + ".");
               break;
@@ -547,6 +547,7 @@ export async function POST(request: Request) {
             if (signal.aborted) throw nextError;
             fallbackError = nextError;
             activeModel = selectedModel;
+            send({ type: "reset" });
           }
         }
         if (!answer.trim()) {
@@ -597,11 +598,12 @@ export async function POST(request: Request) {
             }
           ];
           try {
-            send({ type: "reset" });
             const repaired = await callModel(accountId, apiToken, repairMessages,
               systemInstruction + "\\n\\nCORREÇÃO OBJETIVA: preserve o código e corrija somente os problemas apontados. Retorne o arquivo completo, sem auditoria adicional.",
-              repairTokens, signal, 90_000, activeModel, false, chunk => send({ type: "token", response: chunk }));
+              repairTokens, signal, 45_000, activeModel);
             if (repaired.trim()) {
+              send({ type: "reset" });
+              for (const chunk of (repaired.match(/[\\s\\S]{1,96}/g) ?? [repaired])) send({ type: "token", response: chunk });
               const remainingIssues = inspectCode(repaired);
               if (remainingIssues.length) {
                 status("warning", "A correção foi aplicada, mas ainda há alertas estáticos que precisam ser conferidos.");
