@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assertSafeWorkspacePath, parseWorkspacePlan, validateProjectFiles } from "../lib/workspace-patch.ts";
+import ts from "typescript";
+import { readFileSync } from "node:fs";
+
+const source = readFileSync(new URL("../lib/workspace-patch.ts", import.meta.url), "utf8");
+const javascript = ts.transpileModule(source, {
+  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+const workspacePatch = await import("data:text/javascript;base64," + Buffer.from(javascript).toString("base64"));
+const { assertSafeWorkspacePath, parseWorkspacePlan, validateProjectFiles } = workspacePatch;
 const files = [{ path: "index.html", content: "<main></main>" }, { path: "src/main.js", content: "console.log('ready')" }];
 test("aceita snapshot vazio", () => { assert.deepEqual(validateProjectFiles([]), []); });
 test("preserva snapshot válido", () => { assert.deepEqual(validateProjectFiles(files), files); });
