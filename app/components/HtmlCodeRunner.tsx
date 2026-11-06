@@ -31,7 +31,7 @@ function extractHtml(content: string): string | null {
 }
 
 function makeSandboxDocument(code: string) {
-  const policy = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://threejs.org; style-src \'unsafe-inline\' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src data: blob: https:; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; media-src data: blob: https://; connect-src https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://threejs.org https://raw.githubusercontent.com; object-src \'none\'; base-uri \'none\'; form-action \'none\'; frame-src \'none\'">';
+  const policy = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://threejs.org; style-src \'unsafe-inline\' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src data: blob: https:; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; media-src data: blob: https:; connect-src https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://threejs.org https://raw.githubusercontent.com; object-src \'none\'; base-uri \'none\'; form-action \'none\'; frame-src \'none\'">';
   const bridge = [
     "<script>",
     "(() => {",
@@ -45,13 +45,20 @@ function makeSandboxDocument(code: string) {
     "</script>"
   ].join("");
 
+  const needsGlobalThree = /\bTHREE\s*\./.test(code) &&
+    !/<script\b[^>]*src=["'][^"']*three(?:\.min)?(?:\.module)?\.js/i.test(code) &&
+    !/from\s+["']three["']/.test(code);
+  const threeFallback = needsGlobalThree
+    ? '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.128.0/three.min.js"></script>'
+    : "";
+
   let document = code;
   if (/<head\b[^>]*>/i.test(document)) {
-    document = document.replace(/<head\b[^>]*>/i, match => match + policy + bridge);
+    document = document.replace(/<head\b[^>]*>/i, match => match + policy + bridge + threeFallback);
   } else if (/<html\b[^>]*>/i.test(document)) {
-    document = document.replace(/<html\b[^>]*>/i, match => match + "<head>" + policy + bridge + "</head>");
+    document = document.replace(/<html\b[^>]*>/i, match => match + "<head>" + policy + bridge + threeFallback + "</head>");
   } else {
-    document = "<!doctype html><html><head>" + policy + bridge + "</head><body>" + document + "</body></html>";
+    document = "<!doctype html><html><head>" + policy + bridge + threeFallback + "</head><body>" + document + "</body></html>";
   }
   if (!/<body\b/i.test(document) && /<\/html\s*>/i.test(document)) {
     document = document.replace(/<\/html\s*>/i, "<body></body></html>");
