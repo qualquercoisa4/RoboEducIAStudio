@@ -247,7 +247,7 @@ export default function Home() {
         <header className="chat-top">
           <button className="mobile-menu" onClick={() => setSidebar(true)} aria-label="Abrir menu">☰</button>
           <div>Assistente inteligente <span>BETA</span></div>
-          <a href="/studio">Game Studio ↗</a>
+          <a href="/workspace">Área de trabalho ↗</a>
         </header>
 
         <div className={`chat-content ${messages.length ? "has-chat" : ""}`}>
