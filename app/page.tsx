@@ -33,15 +33,26 @@ export default function Home() {
   setLocalState("loading");setError("");setProgress("Baixando modelo de linguagem…");
   try{
    const {pipeline,InterruptableStoppingCriteria}=await import("@huggingface/transformers");
-   const hasWebGPU="gpu" in navigator;
-   const generator=await pipeline("text-generation","onnx-community/Qwen2.5-Coder-0.5B-Instruct",{
+   // Celulares recebem um modelo muito menor para evitar que o navegador encerre a aba
+   // ao alocar centenas de MB de pesos durante a inicialização.
+   const isMobile=window.matchMedia("(max-width: 760px)").matches||navigator.maxTouchPoints>1;
+   const hasWebGPU=!isMobile&&"gpu" in navigator;
+   const modelId=isMobile
+    ?"onnx-community/SmolLM2-135M-Instruct-ONNX"
+    :"onnx-community/Qwen2.5-Coder-0.5B-Instruct";
+   const generator=await pipeline("text-generation",modelId,{
     dtype:"q4",
-    ...(hasWebGPU?{device:"webgpu" as const}:{}),
-    progress_callback:(report:{status:string;progress?:number})=>{if(report.status==="progress"&&typeof report.progress==="number")setProgress(`Baixando modelo: ${Math.round(report.progress)}%`);else if(report.status==="initiate")setProgress("Conectando ao repositório do modelo…");else if(report.status==="done")setProgress("Preparando pesos do modelo…");}
+    ...(hasWebGPU?{device:"webgpu" as const}:{device:"wasm" as const}),
+    progress_callback:(report:{status:string;progress?:number})=>{
+     if(report.status==="progress"&&typeof report.progress==="number")setProgress(`Baixando modelo: ${Math.round(report.progress)}%`);
+     else if(report.status==="initiate")setProgress("Conectando ao repositório do modelo…");
+     else if(report.status==="done")setProgress(isMobile?"Carregando modelo leve na memória…":"Preparando pesos do modelo…");
+    }
    });
    engineRef.current=generator as unknown as LocalGenerator;
    interruptRef.current=new InterruptableStoppingCriteria();
-   setLocalState("ready");setProgress(hasWebGPU?"Modelo carregado com aceleração WebGPU.":"Modelo carregado em modo CPU (pode ser mais lento).");
+   setLocalState("ready");
+   setProgress(isMobile?"Modelo leve carregado em modo econômico para celular.":hasWebGPU?"Modelo carregado com aceleração WebGPU.":"Modelo carregado em modo CPU (pode ser mais lento).");
   }catch(e){console.error("Local model initialization failed",e);setLocalState("error");setError(e instanceof Error?e.message:"Não foi possível carregar o modelo local.");}
  }
  async function send(value?:string){
