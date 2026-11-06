@@ -2,7 +2,7 @@
 
 import "./workspace.css";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 type ProjectFile = { path: string; content: string; updatedAt: number };
 type Project = { name: string; files: ProjectFile[] };
@@ -23,8 +23,62 @@ function makePreview(html:string,files:ProjectFile[]){
  }
  return result;
 }
+const INITIAL_PROJECT: Project = { name: "Meu projeto", files: starterFiles };
+let workspaceCacheRaw: string | null | undefined;
+let workspaceCache: Project = INITIAL_PROJECT;
+
+function getWorkspaceSnapshot(): Project {
+ let raw: string | null;
+ try {
+  raw = localStorage.getItem(STORAGE_KEY);
+ } catch {
+  return INITIAL_PROJECT;
+ }
+ if (raw === workspaceCacheRaw) return workspaceCache;
+ workspaceCacheRaw = raw;
+ if (raw) {
+  try {
+   const parsed = JSON.parse(raw) as Project;
+   if (parsed && typeof parsed.name === "string" && Array.isArray(parsed.files) && parsed.files.length > 0) {
+    workspaceCache = parsed;
+    return workspaceCache;
+   }
+  } catch {
+   localStorage.removeItem(STORAGE_KEY);
+  }
+ }
+ workspaceCache = INITIAL_PROJECT;
+ return workspaceCache;
+}
+
+function getServerWorkspaceSnapshot(): Project {
+ return INITIAL_PROJECT;
+}
+
+function subscribeToWorkspace(callback: () => void) {
+ window.addEventListener("storage", callback);
+ window.addEventListener("roboeduc-workspace-change", callback);
+ return () => {
+  window.removeEventListener("storage", callback);
+  window.removeEventListener("roboeduc-workspace-change", callback);
+ };
+}
+
 export default function WorkspacePage(){
- const [project,setProject]=useState<Project>({name:"Meu projeto",files:starterFiles});
+ const project = useSyncExternalStore(subscribeToWorkspace, getWorkspaceSnapshot, getServerWorkspaceSnapshot);
+ const setProject = (update: Project | ((current: Project) => Project)) => {
+  const current = getWorkspaceSnapshot();
+  const next = typeof update === "function" ? update(current) : update;
+  const serialized = JSON.stringify(next);
+  try {
+   localStorage.setItem(STORAGE_KEY, serialized);
+   workspaceCacheRaw = serialized;
+   workspaceCache = next;
+   window.dispatchEvent(new Event("roboeduc-workspace-change"));
+  } catch (error) {
+   console.error("Não foi possível salvar o projeto localmente.", error);
+  }
+ };
  const projectRef=useRef(project);
  useEffect(()=>{projectRef.current=project},[project]);
  const [selectedPath,setSelectedPath]=useState("index.html");
@@ -39,19 +93,7 @@ export default function WorkspacePage(){
  const selected=files.find(file=>file.path===selectedPath)||files[0];
  const html=files.find(file=>file.path==="index.html")?.content||files.find(file=>file.path.toLowerCase().endsWith(".html"))?.content||"";
  const preview=useMemo(()=>makePreview(html,files),[html,files]);
- useEffect(()=>{
-  try{
-   const raw=localStorage.getItem(STORAGE_KEY);
-   if(raw){
-    const parsed=JSON.parse(raw);
-    if(parsed&&Array.isArray(parsed.files)&&parsed.files.length){
-     // Restore persisted workspace after mount to avoid an SSR/localStorage mismatch.
-     setProject(parsed); // eslint-disable-line react-hooks/set-state-in-effect
-    }
-   }
-  }catch{localStorage.removeItem(STORAGE_KEY)}
- },[]);
- useEffect(()=>{localStorage.setItem(STORAGE_KEY,JSON.stringify(project))},[project]);
+
  function updateSelected(value:string){if(!selected)return;setProject(old=>({...old,files:old.files.map(f=>f.path===selected.path?{...f,content:value,updatedAt:Date.now()}:f)}))}
  function addFile(){const raw=window.prompt("Caminho do novo arquivo (ex.: src/player.js)");if(!raw)return;const path=raw.trim().replace(/^\/+/, "").replace(/\\/g,"/");if(!path||path.split("/").includes("..")||files.some(f=>f.path===path)){setStatus("Caminho inválido ou arquivo já existente.");return}setProject(old=>({...old,files:[...old.files,{path,content:"",updatedAt:Date.now()}]}));setSelectedPath(path);setTab("code")}
  function removeFile(){if(!selected||!window.confirm("Excluir "+selected.path+"?"))return;const next=files.filter(f=>f.path!==selected.path);setProject(old=>({...old,files:next}));setSelectedPath(next[0]?.path||"")}
