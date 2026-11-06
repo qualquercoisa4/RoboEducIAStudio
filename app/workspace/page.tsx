@@ -123,9 +123,10 @@ export default function WorkspacePage(){
      return;
     }
     if(event.type==="file_complete"){
+     if(typeof event.path!=="string"||typeof event.contentLength!=="number")throw new Error("Evento de conclusão de arquivo malformado.");
      const content=pendingFiles.get(event.path);
-     if(typeof event.path!=="string"||typeof content!=="string"||!plannedFile(event.path)||!Number.isInteger(event.contentLength)||content.length!==event.contentLength){
-      throw new Error("O arquivo recebido está incompleto ou diverge do tamanho confirmado pelo servidor: "+String(event.path)+".");
+     if(typeof content!=="string"||!plannedFile(event.path)||!Number.isInteger(event.contentLength)||content.length!==event.contentLength){
+      throw new Error("O arquivo recebido está incompleto ou diverge do tamanho confirmado pelo servidor: "+event.path+".");
      }
      completedFiles.set(event.path,event.contentLength);
      return;
@@ -133,19 +134,21 @@ export default function WorkspacePage(){
     if(event.type==="apply"){
      if(!plan||applySignal)throw new Error("A autorização de aplicação está ausente ou duplicada.");
      if(typeof event.summary!=="string"||!Array.isArray(event.operations)||!event.fileLengths||typeof event.fileLengths!=="object")throw new Error("A autorização de aplicação está malformada.");
-     if(JSON.stringify(event.operations)!==JSON.stringify(plan.operations))throw new Error("O conjunto de operações mudou durante a geração.");
+     const operations=event.operations as WorkspaceOperation[];
+     const fileLengths=event.fileLengths as Record<string,number>;
+     if(JSON.stringify(operations)!==JSON.stringify(plan.operations))throw new Error("O conjunto de operações mudou durante a geração.");
      for(const operation of plan.operations){
       if(operation.action==="delete")continue;
-      const expected=event.fileLengths[operation.path];
+      const expected=fileLengths[operation.path];
       if(!Number.isInteger(expected)||!completedFiles.has(operation.path)||completedFiles.get(operation.path)!==expected){
        throw new Error("O arquivo "+operation.path+" não foi integralmente recebido e confirmado.");
       }
      }
-     if(Object.keys(event.fileLengths).length!==plan.operations.filter(operation=>operation.action!=="delete").length)throw new Error("A autorização contém arquivos ausentes ou inesperados.");
-     applySignal={summary:event.summary,operations:event.operations,fileLengths:event.fileLengths};
+     if(Object.keys(fileLengths).length!==plan.operations.filter(operation=>operation.action!=="delete").length)throw new Error("A autorização contém arquivos ausentes ou inesperados.");
+     applySignal={summary:event.summary,operations,fileLengths};
      return;
     }
-    if(event.type==="error")throw new Error(event.error||"Falha na geração.");
+    if(event.type==="error")throw new Error(typeof event.error==="string"?event.error:"Falha na geração.");
     if(event.type==="done"){doneReceived=true;return}
    };
 
