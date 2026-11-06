@@ -634,3 +634,21 @@ body:has(.prompt-app){background:#f7f8fb;color:#4d5060;font-family:Arial,Helveti
  .difficulty-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
  .difficulty-grid .visual-option{min-height:112px}
 }
+
+
+/* Cards com capturas reais de jogos — sem pictogramas/emoji */
+.prompt-app .choice-art.screenshot-art{height:150px;display:block;background:#e8edf2}
+.prompt-app .choice-art.screenshot-art img{display:block;position:static;width:100%;height:100%;object-fit:cover;filter:none}
+.prompt-app .choice-art.screenshot-art:before,.prompt-app .choice-art.screenshot-art:after{display:none}
+.prompt-app .choice-art.screenshot-art b{z-index:2;text-shadow:0 1px 5px #0008}
+.prompt-app .objective-art.screenshot-art{width:112px;height:76px;flex:none;overflow:hidden;border-radius:10px;background:#e8edf2;display:block}
+.prompt-app .objective-art.screenshot-art img{display:block;width:100%;height:100%;object-fit:cover}
+.prompt-app .visual-option img{width:100%;height:76px;object-fit:cover;border-radius:8px}
+.prompt-app .visual-option{padding:8px;overflow:hidden}
+.prompt-app .visual-option strong{font-size:11px}
+.prompt-app .visual-option small{font-size:9px}
+@media(max-width:650px){
+ .prompt-app .choice-art.screenshot-art{height:118px}
+ .prompt-app .objective-art.screenshot-art{width:84px;height:64px}
+ .prompt-app .visual-option img{height:66px}
+}
