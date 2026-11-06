@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-type LocalGenerator = { tokenizer: unknown; (messages: Message[], options: { max_new_tokens: number; do_sample: boolean; streamer: unknown }): Promise<unknown> };
+type LocalGenerator = { tokenizer: unknown; (messages: Message[], options: { max_new_tokens: number; do_sample: boolean; streamer: unknown; stopping_criteria: unknown }): Promise<unknown> };
 
 type Message = { role: string; content: string };
 type Conversation = { id: string; title: string; messages: Message[]; updatedAt: number };
@@ -20,7 +20,7 @@ export default function Home() {
  const [cloudReady,setCloudReady]=useState(false),[localState,setLocalState]=useState<"idle"|"loading"|"ready"|"error">("idle");
  const [progress,setProgress]=useState(""),[sidebar,setSidebar]=useState(false),[error,setError]=useState("");
  const bottom=useRef<HTMLDivElement>(null),area=useRef<HTMLTextAreaElement>(null);
- const engineRef=useRef<LocalGenerator|null>(null),cancelRef=useRef(false);
+ const engineRef=useRef<LocalGenerator|null>(null),interruptRef=useRef<{interrupt:()=>void;reset:()=>void}|null>(null),cancelRef=useRef(false);
  const active=items.find(x=>x.id===activeId),messages=active?.messages??[];
  useEffect(()=>{try{const raw=localStorage.getItem(KEY);if(raw){const parsed=JSON.parse(raw) as Conversation[];if(Array.isArray(parsed)){setItems(parsed);setActiveId(parsed[0]?.id??"");}}}catch{} fetch("/api/status").then(r=>r.json()).then(x=>setCloudReady(Boolean(x.configured))).catch(()=>setCloudReady(false));},[]);
  useEffect(()=>{if(items.length)localStorage.setItem(KEY,JSON.stringify(items));else localStorage.removeItem(KEY);},[items]);
