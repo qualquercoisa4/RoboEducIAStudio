@@ -20,6 +20,29 @@ const MAX_DEEP_OUTPUT_TOKENS = 8_192;
 const MAX_REPAIR_TOKENS = 2_048;
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
+const REVIEW_SYSTEM = `
+Você é um revisor técnico independente de código. Examine o pedido original e a solução gerada.
+Procure erros de lógica e integração, não apenas sintaxe: referências a elementos removidos do DOM, IDs e seletores inexistentes, variáveis sem inicialização, eventos que não funcionam, estados impossíveis, limites incorretos, colisões inconsistentes, dependências ausentes e requisitos ignorados.
+Não reescreva o código. Não exponha raciocínio interno. Responda exclusivamente em JSON válido, neste formato:
+{"needsFix": false, "findings": []}
+Se encontrar problemas concretos que possam impedir o funcionamento ou contrariar o pedido, use needsFix=true e findings com descrições curtas e objetivas. Não invente problemas hipotéticos.
+`;
+
+function parseReviewReport(raw: string): { needsFix: boolean; findings: string[] } | null {
+  const match = raw.match(/\\{[\\s\\S]*\\}/);
+  if (!match) return null;
+  try {
+    const value = JSON.parse(match[0]) as { needsFix?: unknown; findings?: unknown };
+    if (typeof value.needsFix !== "boolean" || !Array.isArray(value.findings)) return null;
+    return {
+      needsFix: value.needsFix,
+      findings: value.findings.filter((item): item is string => typeof item === "string").slice(0, 8)
+    };
+  } catch {
+    return null;
+  }
+}
+
 const QUALITY_RULES = `
 PADRÃO DE QUALIDADE ROBOEDUC:
 - Responda em português brasileiro, com precisão, clareza e foco educacional.
@@ -326,31 +349,57 @@ export async function POST(request: Request) {
       status("context", "Preparando o contexto e os requisitos da solicitação.");
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
 
-      let answer = await callModel(accountId, apiToken, messages, systemInstruction, maxTokens, signal, 40_000);
+      let answer = await callModel(accountId, apiToken, messages, systemInstruction, maxTokens, signal, mode === "deep" ? 36_000 : 40_000);
       if (!answer.trim()) throw new Error("O modelo encerrou a geração sem retornar texto. Tente novamente.");
 
       if (isLikelyCodeTask(messages, answer)) {
         status("review", "Verificando integridade dos blocos, sintaxe e sinais de código incompleto.");
-        const issues = inspectCode(answer);
-        if (issues.length) {
+        const findings = inspectCode(answer);
+
+        if (mode === "deep") {
+          status("audit", "Executando uma auditoria adicional de lógica e integração do código.");
+          try {
+            const audit = await callModel(
+              accountId,
+              apiToken,
+              [
+                ...messages,
+                { role: "assistant", content: answer },
+                { role: "user", content: "Faça a auditoria técnica desta solução. Responda somente no formato JSON definido nas instruções do revisor." }
+              ],
+              REVIEW_SYSTEM,
+              640,
+              signal,
+              7_000
+            );
+            const report = parseReviewReport(audit);
+            if (report?.needsFix) findings.push(...report.findings);
+          } catch (auditError) {
+            if (signal.aborted) throw auditError;
+            status("audit-limited", "A auditoria adicional não terminou a tempo; a revisão estática continua válida como verificação parcial.");
+          }
+        }
+
+        const uniqueFindings = [...new Set(findings)];
+        if (uniqueFindings.length) {
           status("repair", "A revisão encontrou possíveis falhas. Solicitando uma correção antes da entrega.");
           const repairMessages: ChatMessage[] = [
             ...messages,
             { role: "assistant", content: answer },
             {
               role: "user",
-              content: "Faça uma revisão técnica e corrija a resposta anterior. A verificação automática apontou: " +
-                issues.join("; ") +
+              content: "Faça uma revisão técnica e corrija a resposta anterior. A verificação encontrou: " +
+                uniqueFindings.join("; ") +
                 ". Reescreva a resposta completa, preserve o pedido e as decisões anteriores, feche todos os blocos e não use placeholders. Não afirme que executou o código. Entregue a versão completa corrigida."
             }
           ];
           try {
-            const repaired = await callModel(accountId, apiToken, repairMessages, systemInstruction, repairTokens, signal, 15_000);
+            const repaired = await callModel(accountId, apiToken, repairMessages, systemInstruction, repairTokens, signal, mode === "deep" ? 12_000 : 15_000);
             if (repaired.trim()) {
               const remainingIssues = inspectCode(repaired);
               if (remainingIssues.length) {
                 status("warning", "A correção foi aplicada, mas ainda há alertas estáticos que precisam ser conferidos.");
-                answer = repaired + "\n\n> A revisão automática ainda identificou pontos que precisam de conferência: " + remainingIssues.join(", ") + ". A execução real deve ser testada no navegador.";
+                answer = repaired + "\\n\\n> A revisão automática ainda identificou pontos que precisam de conferência: " + remainingIssues.join(", ") + ". A execução real deve ser testada no navegador.";
               } else {
                 status("reviewed", "A revisão estática foi concluída após a correção.");
                 answer = repaired;
@@ -359,10 +408,12 @@ export async function POST(request: Request) {
           } catch (repairError) {
             if (signal.aborted) throw repairError;
             status("warning", "A geração foi preservada, mas a etapa de correção automática não terminou a tempo.");
-            answer += "\n\n> A revisão automática não conseguiu concluir a correção dentro do tempo disponível. Teste o código no executor e envie eventuais erros para a IA.";
+            answer += "\\n\\n> A revisão automática não conseguiu concluir a correção dentro do tempo disponível. Teste o código no executor e envie eventuais erros para a IA.";
           }
         } else {
-          status("reviewed", "Nenhum problema sintático conhecido foi detectado na revisão estática.");
+          status("reviewed", mode === "deep"
+            ? "A revisão estática e a auditoria adicional não identificaram falhas concretas."
+            : "Nenhum problema sintático conhecido foi detectado na revisão estática.");
         }
       } else {
         status("reviewed", "Resposta conferida quanto à presença de conteúdo e consistência básica.");
