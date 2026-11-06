@@ -44,8 +44,8 @@ export default function Home() {
    while(true){
     const {value,done}=await reader.read();if(done)break;
     buffer+=decoder.decode(value,{stream:true});
-    const chunks=buffer.split("\\n\\n");buffer=chunks.pop()??"";
-    for(const chunk of chunks)for(const line of chunk.split("\\n")){
+    const chunks=buffer.split("\n\n");buffer=chunks.pop()??"";
+    for(const chunk of chunks)for(const line of chunk.split("\n")){
      if(!line.startsWith("data:"))continue;
      const raw=line.slice(5).trim();if(!raw||raw==="[DONE]")continue;
      try{const data=JSON.parse(raw);const token=data.response??data.result?.response??data.choices?.[0]?.delta?.content??data.delta?.response??"";if(typeof token==="string"&&token)append(token);if(data.error)throw new Error(data.error);}
