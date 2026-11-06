@@ -413,3 +413,19 @@ html:has(.studio-shell),body:has(.studio-shell){height:100%;overflow:hidden}
   .welcome-brand{margin-bottom:20px}
   .composer-area{width:calc(100% - 24px)}
 }
+
+
+/* Correção de contraste das mensagens no tema claro RoboEduc */
+.markdown-message{color:#403b48!important}
+.markdown-message .md-paragraph{color:#403b48!important}
+.markdown-message strong{color:#282431!important}
+.markdown-message em{color:#625b69!important}
+.markdown-message a{color:#287fb9!important}
+.markdown-message .md-heading{color:#494351!important}
+.markdown-message .md-inline-code{background:#f0edf3;border-color:#ded8e4;color:#5a4b68}
+.markdown-message .md-table th{background:#edf4f8;color:#3c6178}
+.markdown-message .md-table td{color:#403b48}
+.message-body>.message-text{color:#403b48}
+.message.user .message-text,.message.user .markdown-message,.message.user .md-paragraph{color:#34303a!important}
+.message.assistant .message-text,.message.assistant .markdown-message{color:#403b48}
+.error-banner{font-size:13px;line-height:1.5}
