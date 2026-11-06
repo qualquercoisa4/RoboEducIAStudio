@@ -567,9 +567,7 @@ export async function POST(request: Request) {
               REVIEW_SYSTEM,
               640,
               signal,
-              7_000,
-              selectedModel
-            );
+              7_000, activeModel);
             const report = parseReviewReport(audit);
             if (report?.needsFix) findings.push(...report.findings);
           } catch (auditError) {
