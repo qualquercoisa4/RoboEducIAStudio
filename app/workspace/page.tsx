@@ -264,77 +264,69 @@ export default function WorkspacePage(){
    setHistory(old=>[...old,{role:"assistant",text:cancelled?message:"Não consegui aplicar as alterações: "+message}]);
   }finally{if(agentControllerRef.current===controller)agentControllerRef.current=null;setBusy(false)}
  }
+ function stopAgent(){agentControllerRef.current?.abort()}
+ useEffect(()=>()=>agentControllerRef.current?.abort(),[]);
  return <main className="studio-shell">
-  <header className="studio-topbar"><Link href="/" className="studio-back">←</Link><div className="studio-project"><b>{project.name}</b><small>RoboEduc AI Studio</small></div><button onClick={exportFiles}>Exportar</button><button disabled={busy} onClick={()=>{const name=window.prompt("Nome do projeto",project.name);if(name?.trim())setProject(old=>({...old,name:name.trim()}))}}>Renomear</button></header>
-  <nav className="studio-main-tabs"><button className={tab==="chat"?"selected":""} onClick={()=>setTab("chat")}>✦ Chat</button><button className={tab==="code"?"selected":""} onClick={()=>setTab("code")}>‹/› Código <small>{files.length}</small></button><button className={tab==="preview"?"selected":""} onClick={()=>setTab("preview")}>◉ Prévia</button></nav>
-  {tab==="chat"&&<section className="studio-chat-view"><div className="studio-chat-history">{history.length===0&&<div className="studio-chat-intro"><div>✦</div><h1>O que vamos construir?</h1><p>Descreva o que deseja. A IA vai analisar e editar os arquivos do projeto.</p></div>}{history.map((item,i)=><article key={i} className={"studio-message "+item.role}><b>{item.role==="user"?"Você":"RoboEduc AI"}</b><p>{item.text}</p></article>)}{busy&&<article className="studio-message assistant"><b>RoboEduc AI</b><p className="studio-thinking">{status}</p></article>}</div><div className="studio-chat-composer"><textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void askAI()}}} placeholder="Descreva o que deseja criar ou modificar..." disabled={busy}/><div className="studio-controls"><select value={model} onChange={e=>setModel(e.target.value)} disabled={busy}><option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next</option><option value="openrouter:qwen/qwen-2.5-coder-32b-instruct">Qwen2.5 Coder 32B (teste)</option><option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash</option><option value="cloudflare">Cloudflare Workers AI</option><option value="google/gemma-4-31b-it:free">Gemma 4 31B</option><option value="cohere/north-mini-code:free">North Mini Code</option></select><select value={mode} onChange={e=>setMode(e.target.value)} disabled={busy}><option value="complete">Completo</option><option value="deep">Profundo</option><option value="fast">Rápido</option></select><button onClick={()=>void askAI()} disabled={busy||!prompt.trim()}>{busy?"Gerando...":"Enviar ↑"}</button></div><small>Enter envia · Shift + Enter quebra linha</small></div></section>}
-  {tab==="code"&&<section className="studio-code-view"><aside className="studio-file-rail"><div className="studio-file-heading"><b>ARQUIVOS</b><button onClick={addFile} disabled={busy}>＋</button></div>{files.map(f=><button key={f.path} className={selected?.path===f.path?"active":""} onClick={()=>setSelectedPath(f.path)}>{f.path}</button>)}<div className="studio-file-footer"><button onClick={exportFiles}>Exportar</button><button onClick={removeFile} disabled={!selected||busy}>Excluir</button></div></aside><div className="studio-editor-pane"><div className="studio-editor-title">{selected?.path||"Nenhum arquivo"}</div><textarea className="studio-editor" spellCheck={false} disabled={busy} value={selected?.content||""} onChange={e=>updateSelected(e.target.value)}/></div></section>}
-  {tab==="preview"&&<section className="studio-preview-view"><div className="studio-preview-toolbar"><span>◉ Prévia do projeto <small className={previewReady?"preview-state ready":"preview-state"}>{previewReady?"EXECUTANDO":"AGUARDANDO"}</small></span><div className="studio-preview-actions"><button onClick={()=>{setPreviewErrors([]);setPreviewReady(false);setPreviewReload(value=>value+1)}} disabled={!html}>↻ Atualizar</button><button onClick={()=>setTab("code")}>‹/› Código</button></div></div>{html?<><iframe key={previewReload} ref={previewFrameRef} title="Prévia do projeto" className="studio-preview-frame" sandbox="allow-scripts allow-forms allow-pointer-lock" srcDoc={preview}/>{previewErrors.length>0&&<div className="studio-preview-diagnostics"><div className="studio-diagnostics-head"><div><b>Console de execução</b><small>{previewErrors.length} problema(s) detectado(s)</small></div><div><button onClick={()=>setPreviewErrors([])}>Limpar</button><button className="diagnostics-fix" onClick={()=>void askAI("Corrija os erros reais detectados na prévia deste projeto. Preserve o objetivo e as funcionalidades existentes. Analise os arquivos atuais e altere somente os necessários.\n\nErros do navegador:\n"+previewErrors.map((error,index)=>(index+1)+". "+error).join("\n"))}>Corrigir com IA</button></div></div><ul>{previewErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>}</>:<div className="studio-empty-preview">Projeto sem index.html. <button onClick={()=>setTab("chat")}>Criar com IA</button></div>}</section>}
+  <header className="studio-topbar">
+   <Link href="/" className="studio-back" aria-label="Voltar ao Game Creator">←</Link>
+   <div className="studio-project"><b>{project.name}</b><small>ROBOEDUC AI STUDIO <span>·</span> ÁREA DE TRABALHO</small></div>
+   <span className="studio-cloud-state"><i/> Sandbox de código</span>
+   <button onClick={exportFiles}>Exportar</button>
+   <button disabled={busy} onClick={()=>{const name=window.prompt("Nome do projeto",project.name);if(name?.trim())setProject(old=>({...old,name:name.trim()}))}}>Renomear</button>
+  </header>
+  <nav className="studio-mobile-tabs" aria-label="Painéis da área de trabalho">
+   <button className={tab==="chat"?"selected":""} onClick={()=>setTab("chat")}>✦ Agente</button>
+   <button className={tab==="preview"?"selected":""} onClick={()=>setTab("preview")}>◉ Prévia</button>
+   <button className={tab==="code"?"selected":""} onClick={()=>setTab("code")}>‹/› Código</button>
+  </nav>
+  <div className={`studio-workbench mobile-${tab}`}>
+   <aside className="studio-agent-panel">
+    <div className="studio-agent-header">
+     <div className="studio-agent-avatar">✦</div>
+     <div><b>Agente de programação</b><small><i/> {busy?"TRABALHANDO NO PROJETO":"PRONTO PARA AJUDAR"}</small></div>
+     <button className="agent-history-reset" title="Limpar conversa" onClick={()=>{if(!busy)setHistory([])}}>↺</button>
+    </div>
+    <div className="studio-chat-history">
+     {history.length===0&&<div className="studio-chat-intro"><div>✦</div><h1>O que vamos construir?</h1><p>Descreva uma ideia, peça uma alteração ou solicite que o agente investigue um problema. Ele pode editar vários arquivos, executar comandos e verificar o projeto.</p><div className="studio-agent-capabilities"><span>Editar arquivos</span><span>Executar código</span><span>Rodar testes</span><span>Pesquisar documentação</span></div></div>}
+     {history.map((item,i)=><article key={i} className={"studio-message "+item.role}><b>{item.role==="assistant"?"ROBOEDUC AI":"VOCÊ"}</b><p>{item.text}</p></article>)}
+     {busy&&<article className="studio-message assistant agent-live"><b>ANTIGRAVITY AGENT</b><p className="studio-thinking"><span className="studio-spinner"/> {status}</p></article>}
+    </div>
+    <div className="studio-chat-composer">
+     <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void askAI()}}} placeholder="Descreva o que deseja criar ou modificar..." disabled={busy}/>
+     <div className="studio-controls">
+      <select aria-label="Modelo de IA" value={model} onChange={e=>setModel(e.target.value)} disabled={busy}>
+       <option value="antigravity">Antigravity Agent · Gemini 3.8 Flash</option>
+       <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash · geração em etapas</option>
+       <option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next · geração em etapas</option>
+       <option value="openrouter:qwen/qwen-2.5-coder-32b-instruct">Qwen2.5 Coder 32B (teste)</option>
+       <option value="cloudflare">Cloudflare Workers AI</option>
+      </select>
+      <select aria-label="Intensidade de trabalho" value={mode} onChange={e=>setMode(e.target.value)} disabled={busy}>
+       <option value="fast">Rápido</option><option value="complete">Completo</option><option value="deep">Profundo</option>
+      </select>
+      {busy?<button className="agent-stop" onClick={stopAgent}>Parar</button>:<button onClick={()=>void askAI()} disabled={!prompt.trim()}>Executar ↑</button>}
+     </div>
+     <small>Enter envia · Shift + Enter quebra linha · As alterações são aplicadas após a validação.</small>
+    </div>
+   </aside>
+   <section className="studio-project-view">
+    <div className="studio-canvas-toolbar">
+     <div className="studio-canvas-left"><span className="studio-live-dot"/><b>Prévia do projeto</b><small className={previewReady?"preview-state ready":"preview-state"}>{previewReady?"EXECUTANDO":"AGUARDANDO"}</small></div>
+     <div className="studio-canvas-tabs">
+      <button className={tab==="preview"?"selected":""} onClick={()=>setTab("preview")}>◉ Prévia</button>
+      <button className={tab==="code"?"selected":""} onClick={()=>setTab("code")}>‹/› Código <small>{files.length}</small></button>
+     </div>
+     <div className="studio-canvas-actions">
+      {tab==="code"&&<button onClick={addFile} disabled={busy}>＋ Arquivo</button>}
+      {tab==="code"&&<button onClick={removeFile} disabled={!selected||busy}>Excluir</button>}
+      {tab==="preview"&&<button onClick={()=>{setPreviewErrors([]);setPreviewReady(false);setPreviewReload(value=>value+1)}} disabled={!html}>↻ Atualizar</button>}
+      <button onClick={exportFiles}>Exportar</button>
+     </div>
+    </div>
+    {tab==="code"&&<section className="studio-code-view"><aside className="studio-file-rail"><div className="studio-file-heading"><b>EXPLORADOR</b><button onClick={addFile} disabled={busy}>＋</button></div>{files.map(f=><button key={f.path} className={selected?.path===f.path?"active":""} onClick={()=>setSelectedPath(f.path)}><span className="file-type-icon">{f.path.endsWith(".html")?"◇":f.path.endsWith(".css")?"▧":f.path.endsWith(".json")?"{}":"‹›"}</span>{f.path}</button>)}<div className="studio-file-footer"><span>{files.length} arquivos</span></div></aside><div className="studio-editor-pane"><div className="studio-editor-title"><span>{selected?.path||"Nenhum arquivo"}</span><small>EDITANDO LOCALMENTE</small></div><textarea className="studio-editor" spellCheck={false} disabled={busy} value={selected?.content||""} onChange={e=>updateSelected(e.target.value)}/></div></section>}
+    {tab==="preview"&&<section className="studio-preview-view">{html?<><iframe key={previewReload} ref={previewFrameRef} title="Prévia do projeto" className="studio-preview-frame" sandbox="allow-scripts allow-forms allow-pointer-lock" srcDoc={preview}/>{previewErrors.length>0&&<div className="studio-preview-diagnostics"><div className="studio-diagnostics-head"><div><b>Console de execução</b><small>{previewErrors.length} problema(s) detectado(s)</small></div><div><button onClick={()=>setPreviewErrors([])}>Limpar</button><button className="diagnostics-fix" onClick={()=>void askAI("Corrija os erros reais detectados na prévia deste projeto. Preserve o objetivo e as funcionalidades existentes. Analise os arquivos atuais e altere somente os necessários.\n\nErros do navegador:\n"+previewErrors.map((error,index)=>(index+1)+". "+error).join("\n"))}>Corrigir com IA</button></div></div><ul>{previewErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>}</>:<div className="studio-empty-preview">Projeto sem index.html. <button onClick={()=>setTab("chat")}>Criar com IA</button></div>}</section>}
+   </section>
+  </div>
   <footer className="studio-statusbar"><span>● Projeto local</span><span>{files.length} arquivos</span><span>{status}</span></footer>
  </main>;
-}  function stopAgent(){agentControllerRef.current?.abort()}
-  useEffect(()=>()=>agentControllerRef.current?.abort(),[]);
-  return <main className="studio-shell">
-   <header className="studio-topbar">
-    <Link href="/" className="studio-back" aria-label="Voltar ao Game Creator">←</Link>
-    <div className="studio-project"><b>{project.name}</b><small>ROBOEDUC AI STUDIO <span>·</span> ÁREA DE TRABALHO</small></div>
-    <span className="studio-cloud-state"><i/> Sandbox de código</span>
-    <button onClick={exportFiles}>Exportar</button>
-    <button disabled={busy} onClick={()=>{const name=window.prompt("Nome do projeto",project.name);if(name?.trim())setProject(old=>({...old,name:name.trim()}))}}>Renomear</button>
-   </header>
-   <nav className="studio-mobile-tabs" aria-label="Painéis da área de trabalho">
-    <button className={tab==="chat"?"selected":""} onClick={()=>setTab("chat")}>✦ Agente</button>
-    <button className={tab==="preview"?"selected":""} onClick={()=>setTab("preview")}>◉ Prévia</button>
-    <button className={tab==="code"?"selected":""} onClick={()=>setTab("code")}>‹/› Código</button>
-   </nav>
-   <div className={`studio-workbench mobile-${tab}`}>
-    <aside className="studio-agent-panel">
-     <div className="studio-agent-header">
-      <div className="studio-agent-avatar">✦</div>
-      <div><b>Agente de programação</b><small><i/> {busy?"TRABALHANDO NO PROJETO":"PRONTO PARA AJUDAR"}</small></div>
-      <button className="agent-history-reset" title="Limpar conversa" onClick={()=>{if(!busy)setHistory([])}}>↺</button>
-     </div>
-     <div className="studio-chat-history">
-      {history.length===0&&<div className="studio-chat-intro"><div>✦</div><h1>O que vamos construir?</h1><p>Descreva uma ideia, peça uma alteração ou solicite que o agente investigue um problema. Ele pode editar vários arquivos, executar comandos e verificar o projeto.</p><div className="studio-agent-capabilities"><span>Editar arquivos</span><span>Executar código</span><span>Rodar testes</span><span>Pesquisar documentação</span></div></div>}
-      {history.map((item,i)=><article key={i} className={"studio-message "+item.role}><b>{item.role==="assistant"?"ROBOEDUC AI":"VOCÊ"}</b><p>{item.text}</p></article>)}
-      {busy&&<article className="studio-message assistant agent-live"><b>ANTIGRAVITY AGENT</b><p className="studio-thinking"><span className="studio-spinner"/> {status}</p></article>}
-     </div>
-     <div className="studio-chat-composer">
-      <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void askAI()}}} placeholder="Descreva o que deseja criar ou modificar..." disabled={busy}/>
-      <div className="studio-controls">
-       <select aria-label="Modelo de IA" value={model} onChange={e=>setModel(e.target.value)} disabled={busy}>
-        <option value="antigravity">Antigravity Agent · Gemini 3.8 Flash</option>
-        <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash · geração em etapas</option>
-        <option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next · geração em etapas</option>
-        <option value="openrouter:qwen/qwen-2.5-coder-32b-instruct">Qwen2.5 Coder 32B (teste)</option>
-        <option value="cloudflare">Cloudflare Workers AI</option>
-       </select>
-       <select aria-label="Intensidade de trabalho" value={mode} onChange={e=>setMode(e.target.value)} disabled={busy}>
-        <option value="fast">Rápido</option><option value="complete">Completo</option><option value="deep">Profundo</option>
-       </select>
-       {busy?<button className="agent-stop" onClick={stopAgent}>Parar</button>:<button onClick={()=>void askAI()} disabled={!prompt.trim()}>Executar ↑</button>}
-      </div>
-      <small>Enter envia · Shift + Enter quebra linha · As alterações são aplicadas após a validação.</small>
-     </div>
-    </aside>
-    <section className="studio-project-view">
-     <div className="studio-canvas-toolbar">
-      <div className="studio-canvas-left"><span className="studio-live-dot"/><b>Prévia do projeto</b><small className={previewReady?"preview-state ready":"preview-state"}>{previewReady?"EXECUTANDO":"AGUARDANDO"}</small></div>
-      <div className="studio-canvas-tabs">
-       <button className={tab==="preview"?"selected":""} onClick={()=>setTab("preview")}>◉ Prévia</button>
-       <button className={tab==="code"?"selected":""} onClick={()=>setTab("code")}>‹/› Código <small>{files.length}</small></button>
-      </div>
-      <div className="studio-canvas-actions">
-       {tab==="code"&&<button onClick={addFile} disabled={busy}>＋ Arquivo</button>}
-       {tab==="code"&&<button onClick={removeFile} disabled={!selected||busy}>Excluir</button>}
-       {tab==="preview"&&<button onClick={()=>{setPreviewErrors([]);setPreviewReady(false);setPreviewReload(value=>value+1)}} disabled={!html}>↻ Atualizar</button>}
-       <button onClick={exportFiles}>Exportar</button>
-      </div>
-     </div>
-     {tab==="code"&&<section className="studio-code-view"><aside className="studio-file-rail"><div className="studio-file-heading"><b>EXPLORADOR</b><button onClick={addFile} disabled={busy}>＋</button></div>{files.map(f=><button key={f.path} className={selected?.path===f.path?"active":""} onClick={()=>setSelectedPath(f.path)}><span className="file-type-icon">{f.path.endsWith(".html")?"◇":f.path.endsWith(".css")?"▧":f.path.endsWith(".json")?"{}":"‹›"}</span>{f.path}</button>)}<div className="studio-file-footer"><span>{files.length} arquivos</span></div></aside><div className="studio-editor-pane"><div className="studio-editor-title"><span>{selected?.path||"Nenhum arquivo"}</span><small>EDITANDO LOCALMENTE</small></div><textarea className="studio-editor" spellCheck={false} disabled={busy} value={selected?.content||""} onChange={e=>updateSelected(e.target.value)}/></div></section>}
-     {tab==="preview"&&<section className="studio-preview-view">{html?<><iframe key={previewReload} ref={previewFrameRef} title="Prévia do projeto" className="studio-preview-frame" sandbox="allow-scripts allow-forms allow-pointer-lock" srcDoc={preview}/>{previewErrors.length>0&&<div className="studio-preview-diagnostics"><div className="studio-diagnostics-head"><div><b>Console de execução</b><small>{previewErrors.length} problema(s) detectado(s)</small></div><div><button onClick={()=>setPreviewErrors([])}>Limpar</button><button className="diagnostics-fix" onClick={()=>void askAI("Corrija os erros reais detectados na prévia deste projeto. Preserve o objetivo e as funcionalidades existentes. Analise os arquivos atuais e altere somente os necessários.\n\nErros do navegador:\n"+previewErrors.map((error,index)=>(index+1)+". "+error).join("\n"))}>Corrigir com IA</button></div></div><ul>{previewErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>}</>:<div className="studio-empty-preview">Projeto sem index.html. <button onClick={()=>setTab("chat")}>Criar com IA</button></div>}</section>}
-    </section>
-   </div>
-   <footer className="studio-statusbar"><span>● Projeto local</span><span>{files.length} arquivos</span><span>{status}</span></footer>
-  </main>;
 }
