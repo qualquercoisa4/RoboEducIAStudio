@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import ts from "typescript";
+import { getInlineJavaScriptDiagnostics } from "@/lib/html-validation";
 import { assertSafeWorkspacePath, parseWorkspacePlan, validateProjectFiles, MAX_WORKSPACE_FILES, MAX_WORKSPACE_FILE_CHARS, MAX_WORKSPACE_TOTAL_CHARS, type WorkspaceFileSnapshot, type WorkspaceOperation } from "@/lib/workspace-patch";
 
 export const runtime = "nodejs";
@@ -339,10 +340,11 @@ function inspectCode(answer: string): string[] {
       if (/new\s+THREE\.Raycaster/i.test(code) && /(?:place|colocar|build)/i.test(code) && !/(?:face\.normal|normal\.clone|intersect\.face)/i.test(code)) issues.push("colocação de blocos pode ignorar a face atingida pelo raycast");
       if (/touchstart|touchend/i.test(code) && /(?:moveSpeed|player\.position|keys\[)/i.test(code) && !/pointerdown|pointerup/i.test(code)) issues.push("controles de toque sem Pointer Events em " + source.path);
     }
-    const scripts = isHtml ? [...code.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)].map(match => match[1]) : isScript ? [code] : [];
-    for (const script of scripts) {
-      if (!script.trim()) continue;
-      const result = ts.transpileModule(script, { reportDiagnostics: true, compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } });
+    if (isHtml) {
+      const inlineDiagnostics = getInlineJavaScriptDiagnostics(code);
+      if (inlineDiagnostics.length) issues.push("erro de sintaxe JavaScript inline em " + source.path + " (script " + inlineDiagnostics[0].scriptIndex + ", linha " + inlineDiagnostics[0].line + ")");
+    } else if (isScript) {
+      const result = ts.transpileModule(code, { reportDiagnostics: true, compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } });
       if ((result.diagnostics ?? []).some(d => d.category === ts.DiagnosticCategory.Error)) issues.push("erro de sintaxe JavaScript/TypeScript em " + source.path);
     }
   }
@@ -607,16 +609,10 @@ function validateGeneratedFile(path: string, content: string) {
     if (scriptOpen !== scriptClose || styleOpen !== styleClose || commentOpen !== commentClose) {
       throw new Error("O HTML " + path + " contém tags script/style ou comentário sem fechamento.");
     }
-    const inlineScripts = [...content.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)];
-    for (const match of inlineScripts) {
-      if (!match[1].trim()) continue;
-      const result = ts.transpileModule(match[1], {
-        reportDiagnostics: true,
-        compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
-      });
-      if ((result.diagnostics ?? []).some(item => item.category === ts.DiagnosticCategory.Error)) {
-        throw new Error("O HTML " + path + " contém JavaScript inline com erro de sintaxe.");
-      }
+    const inlineDiagnostics = getInlineJavaScriptDiagnostics(content);
+    if (inlineDiagnostics.length) {
+      const first = inlineDiagnostics[0];
+      throw new Error("O HTML " + path + " contém JavaScript inline com erro de sintaxe no script " + first.scriptIndex + ", linha " + first.line + ", coluna " + first.column + ": " + first.message + ". Nenhum arquivo foi aplicado.");
     }
   }
 }
