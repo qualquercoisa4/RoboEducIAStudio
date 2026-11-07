@@ -6,10 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:workspace": "node --test tests/workspace-patch.test.mjs tests/workspace-preview.test.mjs"
   },
   "dependencies": {
-    "@huggingface/transformers": "^3.8.1",
     "next": "16.4.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
