@@ -917,6 +917,29 @@ async function executeAntigravityWorkspaceEdit(args: {
       cache: "no-store",
       signal: controller
     });
+    // The free Gemini tier can return a short-lived input-token rate limit.
+    // Respect the provider's retry hint once instead of failing immediately.
+    if (interactionResponse.status === 429) {
+      const firstDetail = await interactionResponse.text().catch(() => "");
+      const headerDelay = Number(interactionResponse.headers.get("retry-after"));
+      const bodyDelay = Number(firstDetail.match(/retry(?:\s+in)?\s+(\d+)\s*(?:seconds?|secs?)/i)?.[1]);
+      const retrySeconds = Math.min(60, Math.max(1, Number.isFinite(headerDelay) && headerDelay > 0 ? headerDelay : Number.isFinite(bodyDelay) && bodyDelay > 0 ? bodyDelay : 15));
+      status("rate-limit", "O provedor aplicou um limite temporário. O site aguardará " + retrySeconds + " segundos e tentará novamente uma vez.");
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, retrySeconds * 1000);
+        const abort = () => { clearTimeout(timer); reject(new Error("A solicitação foi cancelada durante a espera pelo limite do provedor.")); };
+        if (controller.aborted) abort();
+        else controller.addEventListener("abort", abort, { once: true });
+      });
+      if (signal.aborted) throw new Error("A solicitação foi cancelada durante a espera pelo limite do provedor.");
+      interactionResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey, "Api-Revision": "2026-05-20" },
+        body: JSON.stringify(requestBody),
+        cache: "no-store",
+        signal: controller
+      });
+    }
   } catch (error) {
     if (signal.aborted) throw error;
     throw new Error(error instanceof Error && error.name === "TimeoutError"
