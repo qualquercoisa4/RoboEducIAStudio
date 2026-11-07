@@ -11,10 +11,10 @@ export type WorkspacePlan = {
   operations: WorkspaceOperation[];
 };
 
-export const MAX_WORKSPACE_FILES = 80;
-export const MAX_WORKSPACE_FILE_CHARS = 120_000;
-export const MAX_WORKSPACE_TOTAL_CHARS = 160_000;
-export const MAX_PATCH_OPERATIONS = 12;
+export const MAX_WORKSPACE_FILES = 300;
+export const MAX_WORKSPACE_FILE_CHARS = 300_000;
+export const MAX_WORKSPACE_TOTAL_CHARS = 900_000;
+export const MAX_PATCH_OPERATIONS = 100;
 
 const BLOCKED_SEGMENTS = new Set([".git", ".next", ".vercel", ".turbo", "node_modules", "coverage"]);
 
