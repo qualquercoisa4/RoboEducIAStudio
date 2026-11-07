@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test:workspace": "node --test tests/workspace-patch.test.mjs tests/workspace-preview.test.mjs"
+    "test:workspace": "node --test tests/workspace-patch.test.mjs tests/workspace-preview.test.mjs tests/html-validation.test.mjs"
   },
   "dependencies": {
     "next": "16.4.5",
