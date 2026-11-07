@@ -18,7 +18,8 @@ type WorkspaceFileEvent =
   | { type: "file_reset"; path: string }
   | { type: "file_complete"; path: string; contentLength: number };
 type WorkspaceApplyEvent = { type: "apply"; summary: string; operations: WorkspaceOperation[]; fileLengths: Record<string, number> };
-type StreamEvent = ProgressEvent | TokenEvent | ErrorEvent | WorkspacePlanEvent | WorkspaceFileEvent | WorkspaceApplyEvent | { type: "done" } | { type: "reset" };
+type WorkspaceAgentSession = { environmentId: string; interactionId: string };
+type StreamEvent = ProgressEvent | TokenEvent | ErrorEvent | WorkspacePlanEvent | WorkspaceFileEvent | WorkspaceApplyEvent | { type: "agent_session"; environmentId: string; interactionId: string } | { type: "done" } | { type: "reset" };
 
 const MODEL = process.env.CLOUDFLARE_MODEL?.trim() || "@cf/qwen/qwen3-30b-a3b-fp8";
 const MAX_MESSAGES = 14;
@@ -675,14 +676,24 @@ async function callWorkspaceModel(
 }
 
 
+function parseWorkspaceAgentSession(value: unknown): WorkspaceAgentSession | null {
+  if (!value || typeof value !== "object") return null;
+  const session = value as { environmentId?: unknown; interactionId?: unknown };
+  if (typeof session.environmentId !== "string" || typeof session.interactionId !== "string") return null;
+  if (!/^env_[A-Za-z0-9_-]{6,200}$/.test(session.environmentId)) return null;
+  if (!/^[A-Za-z0-9_.:/-]{6,240}$/.test(session.interactionId) || session.interactionId.includes("..")) return null;
+  return { environmentId: session.environmentId, interactionId: session.interactionId };
+}
 async function executeAntigravityWorkspaceEdit(args: {
   messages: ChatMessage[];
   projectFiles: WorkspaceFileSnapshot[];
+  mode: WorkMode;
+  agentSession: WorkspaceAgentSession | null;
   send: (event: StreamEvent) => void;
   signal: AbortSignal;
   status: (stage: string, detail: string) => void;
 }) {
-  const { messages, projectFiles, send, signal, status } = args;
+  const { messages, projectFiles, mode, agentSession, send, signal, status } = args;
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("O Antigravity Agent exige GEMINI_API_KEY nas variáveis de ambiente da Vercel.");
 
@@ -888,11 +899,12 @@ async function executeWorkspaceEdit(args: {
   systemInstruction: string;
   mode: WorkMode;
   selectedModel: string;
+  agentSession: WorkspaceAgentSession | null;
   send: (event: StreamEvent) => void;
   signal: AbortSignal;
   status: (stage: string, detail: string) => void;
 }) {
-  const { accountId, apiToken, messages, projectFiles, systemInstruction, mode, selectedModel, send, signal, status } = args;
+  const { accountId, apiToken, messages, projectFiles, systemInstruction, mode, selectedModel, agentSession, send, signal, status } = args;
   if (selectedModel === "antigravity") {
     await executeAntigravityWorkspaceEdit(args);
     return;
@@ -1216,6 +1228,7 @@ export async function POST(request: Request) {
           systemInstruction,
           mode,
           selectedModel,
+          agentSession: parseWorkspaceAgentSession(body.agentSession),
           send,
           signal,
           status
