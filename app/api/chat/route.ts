@@ -927,7 +927,24 @@ export async function POST(request: Request) {
     const requestedInstruction = typeof body.systemInstruction === "string" && body.systemInstruction.trim()
       ? body.systemInstruction.trim().slice(0, 5_000)
       : "Você é o RoboEduc AI, assistente educacional especializado em tecnologia, robótica, eletrônica, programação e ciências. Responda em português brasileiro, com precisão e exemplos práticos.";
-    const systemInstruction = requestedInstruction + "\n\n" + QUALITY_RULES + getTaskPlaybook(messages);
+    // Data obtida no servidor a cada requisição, nunca do conhecimento estático do modelo.
+    const now = new Date();
+    const currentDate = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric",
+      month: "long", year: "numeric"
+    }).format(now);
+    const temporalContext = [
+      "CONTEXTO TEMPORAL CONFIÁVEL DO SERVIDOR:",
+      "Data atual em Brasília: " + currentDate + ".",
+      "Instante UTC: " + now.toISOString() + ".",
+      "Para perguntas sobre a data de hoje, use esta data; nunca estime a data pelo treinamento.",
+      "Para fatos atuais, cargos políticos, acontecimentos recentes ou notícias, não trate memória de treinamento como verificação atual.",
+      "Quando a pesquisa estiver disponível e for solicitada, consulte fontes antes de afirmar dados atuais.",
+      "Nunca invente links, fontes, pesquisas ou alegue ter verificado algo sem resultados efetivos.",
+      "Se não houver resultado de pesquisa, informe claramente que o fato atual não pôde ser confirmado.",
+      "Não apresente páginas conhecidas como fontes efetivamente consultadas se nenhuma consulta ocorreu."
+    ].join("\\n");
+    const systemInstruction = requestedInstruction + "\\n\\n" + temporalContext + "\\n\\n" + QUALITY_RULES + getTaskPlaybook(messages);
     const mode: WorkMode = body.mode === "fast" || body.mode === "deep" ? body.mode : "complete";
     const codeTask = isLikelyCodeTask(messages);
     const runtimeRepair = isRuntimeRepairRequest(messages);
@@ -961,13 +978,20 @@ export async function POST(request: Request) {
 
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
       const generationTimeout = runtimeRepair ? 60_000 : selectedModel.endsWith(":free") ? 90_000 : selectedModel.startsWith("gemini:") ? 120_000 : 120_000;
+      const latestUserQuestion = [...messages].reverse().find(item => item.role === "user")?.content ?? "";
+      const needsFreshInfo = /\\b(hoje|agora|atual|atualmente|recente|últim[oa]s?|notícias?|presidente|vice-presidente|governo|eleiç|cotação|preço|tempo real|esta semana|este mês|2026)\\b/i.test(latestUserQuestion);
+      const canSearch = selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:");
+      const searchRequested = Boolean(body.webSearch) || needsFreshInfo;
+      const enableSearch = canSearch && searchRequested;
+      if (needsFreshInfo && enableSearch) status("freshness", "Solicitando pesquisa para informações que podem ter mudado.");
+      else if (needsFreshInfo) status("freshness", "Data atual informada; este modelo não dispõe de pesquisa web nesta solicitação.");
       const generationInstruction = runtimeRepair
         ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
         : systemInstruction;
       let activeModel = selectedModel;
       let answer = "";
       try {
-        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, Boolean(body.webSearch), chunk => send({ type: "token", response: chunk }));
+        answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal, generationTimeout, activeModel, enableSearch, chunk => send({ type: "token", response: chunk }));
       } catch (primaryError) {
         if (signal.aborted) throw primaryError;
         const message = primaryError instanceof Error ? primaryError.message : String(primaryError);
@@ -993,7 +1017,7 @@ export async function POST(request: Request) {
           try {
             activeModel = fallbackModel;
             answer = await callModel(accountId, apiToken, messages, generationInstruction, maxTokens, signal,
-              fallbackModel === "cloudflare" ? 30_000 : 30_000, activeModel, Boolean(body.webSearch) && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }));
+              fallbackModel === "cloudflare" ? 30_000 : 30_000, activeModel, enableSearch && fallbackModel !== "cloudflare", chunk => send({ type: "token", response: chunk }));
             if (answer.trim()) {
               status("fallback-success", "Resposta recuperada automaticamente por " + fallbackName + ".");
               break;
