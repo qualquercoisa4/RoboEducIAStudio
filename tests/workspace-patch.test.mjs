@@ -21,8 +21,8 @@ test("rejeita caracteres de controle", () => { assert.throws(() => assertSafeWor
 test("rejeita snapshot com tipo, duplicata ou tamanho inválido", () => {
   assert.throws(() => validateProjectFiles([{ path: "a.js", content: 123 }]));
   assert.throws(() => validateProjectFiles([{ path: "src/a.js", content: "" }, { path: "SRC/A.JS", content: "" }]));
-  assert.throws(() => validateProjectFiles([{ path: "large.js", content: "x".repeat(120001) }]));
-  assert.throws(() => validateProjectFiles(Array.from({ length: 81 }, (_, i) => ({ path: "src/" + i + ".js", content: "" }))));
+  assert.throws(() => validateProjectFiles([{ path: "large.js", content: "x".repeat(300001) }]));
+  assert.throws(() => validateProjectFiles(Array.from({ length: 301 }, (_, i) => ({ path: "src/" + i + ".js", content: "" }))));
 });
 test("aceita criação e atualização", () => {
   const plan = parseWorkspacePlan(JSON.stringify({ summary: "Adicionar física", operations: [
@@ -69,12 +69,12 @@ test("rejeita ação desconhecida, duplicatas e arquivo ausente", () => {
   ];
   for (const operations of invalid) assert.throws(() => parseWorkspacePlan(JSON.stringify({ summary: "Teste", operations }), files));
 });
-test("aceita até doze operações em uma edição de projeto", () => {
-  const operations = Array.from({ length: 12 }, (_, i) => ({ path: "new-" + i + ".js", action: "create", reason: "teste" }));
-  assert.equal(parseWorkspacePlan(JSON.stringify({ summary: "Projeto amplo", operations }), files).operations.length, 12);
+test("aceita até cem operações em uma edição de projeto", () => {
+  const operations = Array.from({ length: 100 }, (_, i) => ({ path: "new-" + i + ".js", action: "create", reason: "teste" }));
+  assert.equal(parseWorkspacePlan(JSON.stringify({ summary: "Projeto amplo", operations }), files).operations.length, 100);
 });
-test("rejeita manifesto acima de doze operações", () => {
-  const operations = Array.from({ length: 13 }, (_, i) => ({ path: "new-" + i + ".js", action: "create", reason: "teste" }));
+test("rejeita manifesto acima de cem operações", () => {
+  const operations = Array.from({ length: 101 }, (_, i) => ({ path: "new-" + i + ".js", action: "create", reason: "teste" }));
   assert.throws(() => parseWorkspacePlan(JSON.stringify({ summary: "Muitas", operations }), files));
 });
 test("aceita cerca Markdown completa e rejeita cerca truncada", () => {
