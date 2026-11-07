@@ -835,7 +835,7 @@ async function executeAntigravityWorkspaceEdit(args: {
       agent_config: {
         type: "antigravity",
         model: mode === "fast" ? "gemini-3.5-flash-lite" : "gemini-3.8-flash",
-        max_total_tokens: mode === "fast" ? 16_000 : mode === "deep" ? 48_000 : 28_000
+        max_total_tokens: mode === "fast" ? 48_000 : mode === "deep" ? 96_000 : 64_000
       },
       system_instruction: "You are an autonomous senior software engineer. Use the sandbox tools to inspect, edit, run, test, debug, and verify the user's project. Follow the mounted .agents/AGENTS.md instructions exactly. Always ground completion claims in actual command results. Optimize for useful, complete work with minimal unnecessary exploration. Start editing as soon as you understand the task; do not spend excessive time planning.",
       input: [{ type: "text", text: prompt }],
@@ -989,12 +989,16 @@ async function executeAntigravityWorkspaceEdit(args: {
 
   const finalInteractionId = interactionId;
   const finalState = interaction.status?.toLowerCase() ?? "";
-  if (!finalInteractionId || (finalState !== "completed" && finalState !== "succeeded")) {
-    throw new Error("O Antigravity Agent encerrou com estado " + (interaction.status || "desconhecido") + ": " + (interaction.error?.message || interaction.output_text || "nenhuma alteração foi aplicada."));
+  if (!finalInteractionId || !["completed", "succeeded", "incomplete"].includes(finalState)) {
+    throw new Error("O Antigravity Agent encerrou com estado " + (interaction.status || "desconhecido") + ": " + (interaction.error?.message || interaction.output_text || "a execução foi encerrada sem conclusão."));
   }
 
+  // Persist the session before validating the result so an incomplete run can be resumed.
   send({ type: "agent_session", environmentId, interactionId: finalInteractionId });
-  status("agent-executed", "O agente concluiu a etapa autônoma. Recuperando os arquivos e conferindo o resultado.");
+  status(finalState === "incomplete" ? "agent-partial" : "agent-executed",
+    finalState === "incomplete"
+      ? "O agente atingiu o limite de saída desta etapa. Recuperando qualquer arquivo já produzido; a sessão ficará disponível para continuar."
+      : "O agente concluiu a etapa autônoma. Recuperando os arquivos e conferindo o resultado.");
   const listResponse = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/environments/" + encodeURIComponent(environmentId) + "/files?recursive=true",
     { headers: { "x-goog-api-key": apiKey }, cache: "no-store", signal: controller }
@@ -1049,7 +1053,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     nextProject.set(relativePath, content);
   }
 
-  if (nextProject.size === 0) throw new Error("O agente não retornou arquivos de projeto. Nenhuma alteração foi aplicada.");
+  if (nextProject.size === 0) throw new Error(finalState === "incomplete" ? "O agente atingiu o limite de saída antes de salvar arquivos. A sessão foi preservada; envie “continue o projeto” para retomar do ponto em que parou." : "O agente não retornou arquivos de projeto. Nenhuma alteração foi aplicada.");
   const original = new Map(projectFiles.map(file => [file.path, file.content]));
   const operations: WorkspaceOperation[] = [];
   for (const [path, content] of nextProject) {
