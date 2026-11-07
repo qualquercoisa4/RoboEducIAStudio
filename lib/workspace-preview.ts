@@ -134,7 +134,7 @@ export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[
     const file = path ? byPath.get(path.toLowerCase()) : undefined;
     if (!file || !/\.css$/i.test(file.path)) return tag;
     const media = readAttribute(tag, "media");
-    return '<style data-roboeduc-file="' + file.path + '"' + (media ? ' media="' + media.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + '"' : "") + '>\n' + escapeInlineStyle(file.content) + '\n</style>';
+    return '<style data-roboeduc-file="' + file.path + '"' + (media ? ' media="' + media.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + '"' : "") + '>\n' + escapeInlineStyle(inlineCssImports(file.content, file.path, byPath)) + '\n</style>';
   });
   document = document.replace(/<script\b[^>]*\bsrc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)[^>]*>\s*<\/script\s*>/gi, tag => {
     const src = readAttribute(tag, "src");
