@@ -65,3 +65,24 @@ test("reports unresolved local module imports with a readable preview error", ()
   const result = buildWorkspacePreview(html, [{ path: "src/main.js", content: 'import "./missing.js";' }]);
   assert.match(result, /Depend%C3%AAncia%20ou%20m%C3%B3dulo%20n%C3%A3o%20dispon%C3%ADvel%20no%20preview/);
 });
+
+test("does not rewrite import-like text inside comments and strings", () => {
+  const html = '<html><head></head><body><script type="module" src="src/main.js"></script></body></html>';
+  const code = 'const example = "import \\"./missing.js\\"";\\n// import "./also-missing.js";\\nexport const ready = true;';
+  const result = buildWorkspacePreview(html, [{ path: "src/main.js", content: code }]);
+  assert.match(result, /import \\\"\\.\/missing\\.js/);
+  assert.doesNotMatch(result, /also-missing/);
+  assert.doesNotMatch(result, /Depend%C3%AAncia%20ou%20m%C3%B3dulo/);
+});
+
+test("rewrites export-from and dynamic local imports", () => {
+  const html = '<html><head></head><body><script type="module" src="src/main.js"></script></body></html>';
+  const code = 'export { Player } from "./player.js";\\nconst load = () => import("./lazy.js");';
+  const result = buildWorkspacePreview(html, [
+    { path: "src/main.js", content: code },
+    { path: "src/player.js", content: "export class Player {}" },
+    { path: "src/lazy.js", content: "export const loaded = true;" }
+  ]);
+  assert.equal((result.match(/https:\\/\\/roboeduc\\.local\\/src\\/(?:player|lazy)\\.js/g) ?? []).length, 2);
+});
+
