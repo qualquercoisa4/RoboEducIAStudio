@@ -44,3 +44,24 @@ test("injects isolated preview runtime diagnostics", () => {
   assert.match(result, /__roboeducWorkspacePreview/);
   assert.match(result, /unhandledrejection/);
 });
+
+
+test("resolves Three.js bare imports and its addon package through an import map", () => {
+  const html = '<html><head></head><body><script type="module" src="src/main.js"></script></body></html>';
+  const files = [
+    { path: "src/main.js", content: 'import * as THREE from "three";\nimport { PointerLockControls } from "three/addons/controls/PointerLockControls.js";\nimport { Player } from "./player.js";' },
+    { path: "src/player.js", content: "export class Player {}" }
+  ];
+  const result = buildWorkspacePreview(html, files);
+  assert.match(result, /"three":"https:\/\/unpkg\.com\/three@0\.160\.0\/build\/three\.module\.js"/);
+  assert.match(result, /"three\/addons\/":"https:\/\/unpkg\.com\/three@0\.160\.0\/examples\/jsm\//);
+  assert.match(result, /https:\/\/roboeduc\.local\/src\/player\.js/);
+  assert.match(result, /data:text\/javascript;charset=utf-8/);
+  assert.match(result, /<script type="module" data-roboeduc-file="src\/main\.js">/);
+});
+
+test("reports unresolved local module imports with a readable preview error", () => {
+  const html = '<html><head></head><body><script type="module" src="src/main.js"></script></body></html>';
+  const result = buildWorkspacePreview(html, [{ path: "src/main.js", content: 'import "./missing.js";' }]);
+  assert.match(result, /Módulo não disponível no preview|Dependência ou módulo não disponível no preview/);
+});
