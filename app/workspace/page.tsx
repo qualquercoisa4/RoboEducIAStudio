@@ -10,6 +10,8 @@ type Project = { name: string; files: ProjectFile[] };
 type WorkspaceOperation = { path: string; action: "create" | "update" | "delete"; reason: string };
 type WorkspaceStreamEvent = { type?: unknown; [key: string]: unknown };
 type Tab = "chat" | "code" | "preview";
+type AgentSession = { environmentId: string; interactionId: string };
+const AGENT_SESSION_KEY = "roboeduc-antigravity-session-v1";
 const STORAGE_KEY = "roboeduc-workspace-v1";
 const starterFiles: ProjectFile[] = [
  {path:"index.html",content:"<!doctype html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Meu projeto</title>\n<link rel=\"stylesheet\" href=\"src/style.css\">\n</head>\n<body>\n<main id=\"app\"><h1>Meu projeto</h1><p>Peça à IA para começar.</p></main>\n<script src=\"src/main.js\"></script>\n</body>\n</html>",updatedAt:Date.now()},
@@ -79,6 +81,7 @@ export default function WorkspacePage(){
   }
  };
  useEffect(()=>{projectRef.current=project},[project]);
+ useEffect(()=>{try{const raw=localStorage.getItem(AGENT_SESSION_KEY);if(raw){const parsed=JSON.parse(raw) as AgentSession;if(typeof parsed.environmentId==="string"&&typeof parsed.interactionId==="string")setAgentSession(parsed)}}catch{localStorage.removeItem(AGENT_SESSION_KEY)}},[]);
  useEffect(()=>{
   const onPreviewMessage=(event:MessageEvent)=>{
    if(event.source!==previewFrameRef.current?.contentWindow)return;
@@ -98,6 +101,7 @@ export default function WorkspacePage(){
  const [status,setStatus]=useState("Descreva o que deseja construir ou modificar.");
  const [tab,setTab]=useState<Tab>("preview");
  const [model,setModel]=useState("antigravity");
+ const [agentSession,setAgentSession]=useState<AgentSession|null>(null);
  const agentControllerRef=useRef<AbortController|null>(null);
  const [mode,setMode]=useState("complete");
  const [history,setHistory]=useState<{role:string;text:string}[]>([]);
@@ -128,7 +132,7 @@ export default function WorkspacePage(){
    const response=await fetch("/api/chat",{
     method:"POST",
     headers:{"Content-Type":"application/json",Accept:"text/event-stream"},
-    body:JSON.stringify({messages,projectFiles:snapshot,systemInstruction,mode,model,webSearch:false,structuredOutput:true}),
+    body:JSON.stringify({messages,projectFiles:snapshot,systemInstruction,mode,model,webSearch:false,structuredOutput:true,agentSession:model==="antigravity"?agentSession:null}),
     signal:controller.signal
    });
    if(!response.ok){
@@ -155,6 +159,12 @@ export default function WorkspacePage(){
       event=parsed as WorkspaceStreamEvent;
      }catch{throw new Error("O fluxo SSE contém um evento inválido ou truncado. Nenhuma alteração foi aplicada.")}
     if(event.type==="status"&&typeof event.detail==="string"){setStatus(event.detail);return}
+    if(event.type==="agent_session"&&typeof event.environmentId==="string"&&typeof event.interactionId==="string"){
+     const session={environmentId:event.environmentId,interactionId:event.interactionId};
+     setAgentSession(session);
+     try{localStorage.setItem(AGENT_SESSION_KEY,JSON.stringify(session))}catch{}
+     return;
+    }
     if(event.type==="plan"){
      if(plan)throw new Error("O servidor enviou mais de um manifesto para a mesma operação.");
      if(typeof event.summary!=="string"||!Array.isArray(event.operations))throw new Error("Manifesto recebido em formato inválido.");
@@ -284,7 +294,7 @@ export default function WorkspacePage(){
     <div className="studio-agent-header">
      <div className="studio-agent-avatar">✦</div>
      <div><b>Agente de programação</b><small><i/> {busy?"TRABALHANDO NO PROJETO":"PRONTO PARA AJUDAR"}</small></div>
-     <button className="agent-history-reset" title="Limpar conversa" onClick={()=>{if(!busy)setHistory([])}}>↺</button>
+     <button className="agent-history-reset" title="Reiniciar contexto do agente" onClick={()=>{if(!busy){setHistory([]);setAgentSession(null);try{localStorage.removeItem(AGENT_SESSION_KEY)}catch{}}}}>↺</button>
     </div>
     <div className="studio-chat-history">
      {history.length===0&&<div className="studio-chat-intro"><div>✦</div><h1>O que vamos construir?</h1><p>Descreva uma ideia, peça uma alteração ou solicite que o agente investigue um problema. Ele pode editar vários arquivos, executar comandos e verificar o projeto.</p><div className="studio-agent-capabilities"><span>Editar arquivos</span><span>Executar código</span><span>Rodar testes</span><span>Pesquisar documentação</span></div></div>}
@@ -295,7 +305,7 @@ export default function WorkspacePage(){
      <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void askAI()}}} placeholder="Descreva o que deseja criar ou modificar..." disabled={busy}/>
      <div className="studio-controls">
       <select aria-label="Modelo de IA" value={model} onChange={e=>setModel(e.target.value)} disabled={busy}>
-       <option value="antigravity">Antigravity Agent · Gemini 3.8 Flash</option>
+       <option value="antigravity">Antigravity Agent · 3.8 / Flash-Lite Rápido</option>
        <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash · geração em etapas</option>
        <option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next · geração em etapas</option>
        <option value="openrouter:qwen/qwen-2.5-coder-32b-instruct">Qwen2.5 Coder 32B (teste)</option>
