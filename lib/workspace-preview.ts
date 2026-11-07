@@ -102,6 +102,7 @@ export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[
     const code = isModule ? rewriteModuleImports(file.content, file.path, byPath, new Set()) : file.content;
     return '<script' + attributes + ' data-roboeduc-file="' + file.path + '">\n' + escapeInlineScript(code) + '\n</script>';
   });
+  document = document.replace(/<script\b[^>]*type\s*=\s*["']importmap["'][^>]*>[\s\S]*?<\/script\s*>/i, "");
   const importMap = makeImportMap(files, html);
   if (/<head\b[^>]*>/i.test(document)) document = document.replace(/<head\b[^>]*>/i, match => match + importMap + makeDiagnosticsBridge());
   else if (/<html\b[^>]*>/i.test(document)) document = document.replace(/<html\b[^>]*>/i, match => match + "<head>" + importMap + makeDiagnosticsBridge() + "</head>");
