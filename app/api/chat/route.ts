@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import ts from "typescript";
-import { assertSafeWorkspacePath, parseWorkspacePlan, validateProjectFiles, type WorkspaceFileSnapshot, type WorkspaceOperation } from "@/lib/workspace-patch";
+import { assertSafeWorkspacePath, parseWorkspacePlan, validateProjectFiles, MAX_WORKSPACE_FILES, MAX_WORKSPACE_FILE_CHARS, MAX_WORKSPACE_TOTAL_CHARS, type WorkspaceFileSnapshot, type WorkspaceOperation } from "@/lib/workspace-patch";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -698,7 +698,7 @@ async function executeAntigravityWorkspaceEdit(args: {
   if (!apiKey) throw new Error("O Antigravity Agent exige GEMINI_API_KEY nas variáveis de ambiente da Vercel.");
 
   const totalChars = projectFiles.reduce((total, file) => total + file.content.length, 0);
-  if (totalChars > 160_000) throw new Error("O projeto excede o limite de 160.000 caracteres para iniciar o agente remoto.");
+  if (totalChars > MAX_WORKSPACE_TOTAL_CHARS) throw new Error("O projeto excede o limite de " + MAX_WORKSPACE_TOTAL_CHARS.toLocaleString("pt-BR") + " caracteres para iniciar o agente remoto.");
 
   const agentRules = [
     "# RoboEduc AI Studio — Agent Instructions",
@@ -717,6 +717,25 @@ async function executeAntigravityWorkspaceEdit(args: {
     "6. Read test/build output. Fix failures caused by your changes and rerun the relevant checks. Do not claim a check passed unless its command completed successfully.",
     "7. Inspect the final diff and confirm that only files inside /workspace/project were changed.",
     "8. Finish with a concise Portuguese summary of files changed, checks actually executed, results, and any remaining limitation.",
+    "",
+    "## Research-first engineering and code reuse",
+    "- You have Google Search and URL Context available by default. For non-trivial tasks, research before writing code: search official documentation, maintained GitHub repositories, framework examples, and npm packages.",
+    "- Search for an existing working implementation or starter/template before building a complex subsystem from scratch. Prefer maintained official examples, reputable repositories, and established npm packages.",
+    "- For games, search engine-specific examples and starter projects first. For 3D voxel prototypes, prioritize Three.js voxel examples, raycasting, chunk/greedy meshing, collision, and mobile touch controls. For 2D games, inspect Phaser examples and official project templates.",
+    "- Verify that a reference actually matches the target framework/version and inspect its source and dependencies. Do not assume a search result is compatible just because its title sounds relevant.",
+    "- Reuse a package, template, or small code module when it materially reduces implementation time. Prefer installing a maintained dependency over copying a large unmaintained codebase.",
+    "- Before copying code, inspect its license. Prefer MIT, Apache-2.0, BSD, or public-domain sources. Preserve required copyright/license notices and attribution. Do not copy code with unknown, incompatible, or restrictive licensing.",
+    "- Never blindly paste a whole repository. Extract only the relevant minimal modules, adapt imports and APIs, and verify that the result works in this project.",
+    "- Use npm view / package documentation to verify package names, versions, browser compatibility, and installation instructions. Avoid invented package names and deprecated APIs.",
+    "- When network access or source verification is unavailable, say so and implement a smaller verified alternative instead of pretending research succeeded.",
+    "",
+    "## Prototype delivery standard",
+    "- A prototype must launch and be interactable, not merely contain plausible source code. Include every required file, dependency, asset reference, and startup entry point.",
+    "- For browser prototypes, ensure index.html, module entry points, CSS, and assets resolve correctly. Prefer Vite for multi-file ES-module projects and use a simple static page only when that is genuinely sufficient.",
+    "- For 3D games, validate renderer initialization, camera, resize handling, movement, collision, pointer/touch input, and performance. Do not use desktop-only PointerLockControls as the only control scheme; implement touch look and virtual controls when mobile is in scope.",
+    "- For voxel games, avoid one Mesh per block for large worlds. Use chunking, instancing or merged geometry; implement deterministic block coordinates, raycast targeting, placement/removal, and collision against actual terrain.",
+    "- Add smoke tests or automated checks for the critical interaction loop. Run the dev server/build and inspect browser console output when tools permit.",
+    "- Do not report a prototype as functional unless it has been executed and its main interaction has been verified. Clearly distinguish code inspection from runtime verification."
     "",
     "## Safety and scope",
     "- Do not read, print, copy, or request API keys, environment secrets, credentials, or personal data.",
@@ -773,6 +792,7 @@ async function executeAntigravityWorkspaceEdit(args: {
   }, null, 2);
   const sources = [
     { type: "inline", target: ".agents/AGENTS.md", content: agentRules },
+    ...skills.map(skill => ({ type: "inline", target: skill.path, content: skill.content })),
     { type: "inline", target: "/workspace/roboeduc-workspace-manifest.json", content: manifest },
     ...projectFiles.map(file => ({
       type: "inline",
@@ -788,6 +808,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     status("agent-sync", "Atualizando o sandbox persistente com a versão atual dos arquivos.");
     const uploads = [
       { path: ".agents/AGENTS.md", content: agentRules },
+      ...skills.map(skill => ({ path: skill.path, content: skill.content })),
       { path: "workspace/roboeduc-workspace-manifest.json", content: manifest },
       ...projectFiles.map(file => ({ path: "workspace/project/" + file.path, content: file.content }))
     ];
@@ -1017,7 +1038,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     .map(file => ({ ...file, path: file.path!.replace(/^\/+/, "") }))
     .filter(file => file.path.startsWith(prefix))
     .filter(file => !file.path.slice(prefix.length).split("/").some(segment => ignoredDirectories.has(segment.toLowerCase())));
-  if (remoteFiles.length > 80) throw new Error("O agente gerou mais de 80 arquivos. A aplicação foi cancelada para manter o projeto dentro dos limites do editor.");
+  if (remoteFiles.length > MAX_WORKSPACE_FILES) throw new Error("O agente gerou mais de " + MAX_WORKSPACE_FILES + " arquivos. A aplicação foi cancelada para manter o projeto dentro dos limites do editor.");
 
   const nextProject = new Map<string, string>();
   let totalDownloaded = 0;
@@ -1027,7 +1048,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     const relativePath = remoteFile.path.slice(prefix.length);
     assertSafeWorkspacePath(relativePath);
     const declaredSize = Number(remoteFile.size_bytes ?? 0);
-    if (declaredSize > 120_000) throw new Error("O arquivo " + relativePath + " excedeu o limite de 120.000 bytes do editor.");
+    if (declaredSize > MAX_WORKSPACE_FILE_CHARS) throw new Error("O arquivo " + relativePath + " excedeu o limite de " + MAX_WORKSPACE_FILE_CHARS.toLocaleString("pt-BR") + " bytes do editor.");
     // Do not trust MIME metadata for text files: dotfiles such as .gitignore
     // are frequently labelled application/octet-stream by remote file services.
     // Strict UTF-8 decoding plus a NUL-byte check is the reliable text/binary gate.
@@ -1039,7 +1060,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     );
     if (!downloadResponse.ok) throw new Error("Falha ao baixar " + relativePath + " da sandbox (HTTP " + downloadResponse.status + ").");
     const bytes = await downloadResponse.arrayBuffer();
-    if (bytes.byteLength > 120_000) throw new Error("O arquivo " + relativePath + " excedeu o limite de tamanho do editor.");
+    if (bytes.byteLength > MAX_WORKSPACE_FILE_CHARS) throw new Error("O arquivo " + relativePath + " excedeu o limite de tamanho do editor.");
     if (new Uint8Array(bytes).some(byte => byte === 0)) {
       throw new Error("O agente gerou um arquivo binário não suportado pelo editor de texto: " + relativePath + ". Nenhuma alteração foi aplicada.");
     }
@@ -1051,7 +1072,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     }
     validateGeneratedFile(relativePath, content);
     totalDownloaded += content.length;
-    if (totalDownloaded > 160_000) throw new Error("Os arquivos gerados excederam o limite total de 160.000 caracteres do editor.");
+    if (totalDownloaded > MAX_WORKSPACE_TOTAL_CHARS) throw new Error("Os arquivos gerados excederam o limite total de " + MAX_WORKSPACE_TOTAL_CHARS.toLocaleString("pt-BR") + " caracteres do editor.");
     nextProject.set(relativePath, content);
   }
 
