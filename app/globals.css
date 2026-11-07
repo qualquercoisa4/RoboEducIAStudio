@@ -652,3 +652,5 @@ body:has(.prompt-app){background:#f7f8fb;color:#4d5060;font-family:Arial,Helveti
  .prompt-app .objective-art.screenshot-art{width:84px;height:64px}
  .prompt-app .visual-option img{height:66px}
 }
+
+.prompt-header-actions{display:flex;align-items:center;gap:10px}.ia-studio-link{display:inline-flex;align-items:center;gap:7px;padding:10px 15px;border-radius:10px;background:linear-gradient(135deg,#4598d1,#2878b2);color:#fff;text-decoration:none;font-size:12px;font-weight:800;box-shadow:0 3px 10px #2878b233;transition:transform .15s,box-shadow .15s}.ia-studio-link:hover{transform:translateY(-1px);box-shadow:0 5px 14px #2878b244}.ia-studio-link span{font-size:14px;color:#eaffb4}@media(max-width:650px){.prompt-header-actions{gap:7px}.ia-studio-link{font-size:11px;padding:9px 10px}.main-site-link{font-size:10px;padding:9px 8px}}@media(max-width:370px){.prompt-header-actions{gap:5px}.ia-studio-link{padding:8px 7px;font-size:10px}.main-site-link{padding:8px 7px;font-size:9px}}
