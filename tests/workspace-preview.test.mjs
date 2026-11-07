@@ -71,8 +71,6 @@ test("does not rewrite import-like text inside comments and strings", () => {
   const code = `const example = 'import "./missing.js"';
 // import "./also-missing.js";
 export const ready = true;`;
-// import "./also-missing.js";
-export const ready = true;`;
   const result = buildWorkspacePreview(html, [{ path: "src/main.js", content: code }]);
   assert.match(result, /import "\.\/missing\.js"/);
   assert.match(result, /also-missing/);
