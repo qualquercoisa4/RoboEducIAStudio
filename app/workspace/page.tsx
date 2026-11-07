@@ -82,9 +82,6 @@ export default function WorkspacePage(){
   }
  };
  useEffect(()=>{projectRef.current=project},[project]);
- useEffect(()=>{try{const raw=localStorage.getItem(AGENT_SESSION_KEY);if(raw){const parsed=JSON.parse(raw) as AgentSession;if(typeof parsed.environmentId==="string"&&typeof parsed.interactionId==="string")setAgentSession(parsed)}}catch{localStorage.removeItem(AGENT_SESSION_KEY)}},[]);
- useEffect(()=>{try{const raw=localStorage.getItem(AGENT_HISTORY_KEY);if(raw){const parsed=JSON.parse(raw) as unknown;if(Array.isArray(parsed)){const safe=parsed.filter((item):item is {role:string;text:string}=>Boolean(item&&typeof item==="object"&&(item as {role?:unknown}).role&&(item as {text?:unknown}).text&&["user","assistant"].includes((item as {role:string}).role)&&typeof (item as {text:unknown}).text==="string")).slice(-60);setHistory(safe)}}}catch{localStorage.removeItem(AGENT_HISTORY_KEY)}finally{setHistoryReady(true)}},[]);
- useEffect(()=>{if(!historyReady)return;try{localStorage.setItem(AGENT_HISTORY_KEY,JSON.stringify(history.slice(-60)))}catch{}},[history,historyReady]);
  useEffect(()=>{
   const onPreviewMessage=(event:MessageEvent)=>{
    if(event.source!==previewFrameRef.current?.contentWindow)return;
@@ -109,6 +106,9 @@ export default function WorkspacePage(){
  const [mode,setMode]=useState("complete");
  const [history,setHistory]=useState<{role:string;text:string}[]>([]);
  const [historyReady,setHistoryReady]=useState(false);
+ useEffect(()=>{try{const raw=localStorage.getItem(AGENT_SESSION_KEY);if(raw){const parsed=JSON.parse(raw) as AgentSession;if(typeof parsed.environmentId==="string"&&typeof parsed.interactionId==="string")setAgentSession(parsed)}}catch{localStorage.removeItem(AGENT_SESSION_KEY)}},[]);
+ useEffect(()=>{try{const raw=localStorage.getItem(AGENT_HISTORY_KEY);if(raw){const parsed=JSON.parse(raw) as unknown;if(Array.isArray(parsed)){const safe=parsed.filter((item):item is {role:string;text:string}=>Boolean(item&&typeof item==="object"&&(item as {role?:unknown}).role&&(item as {text?:unknown}).text&&["user","assistant"].includes((item as {role:string}).role)&&typeof (item as {text:unknown}).text==="string")).slice(-60);setHistory(safe)}}}catch{localStorage.removeItem(AGENT_HISTORY_KEY)}finally{setHistoryReady(true)}},[]);
+ useEffect(()=>{if(!historyReady)return;try{localStorage.setItem(AGENT_HISTORY_KEY,JSON.stringify(history.slice(-60)))}catch{}},[history,historyReady]);
  const files=project.files;
  const selected=files.find(file=>file.path===selectedPath)||files[0];
  const html=files.find(file=>file.path==="index.html")?.content||files.find(file=>file.path.toLowerCase().endsWith(".html"))?.content||"";
