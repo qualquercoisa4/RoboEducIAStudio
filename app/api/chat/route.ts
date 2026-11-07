@@ -713,7 +713,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     "2. Form a concise implementation plan. Make the smallest complete set of changes that fulfils the request.",
     "3. Edit all related files consistently. Preserve existing behavior unless the user explicitly asks to change it.",
     "4. Install only dependencies that are genuinely required. Prefer the package manager indicated by the existing lockfile.",
-    "5. Run the available automated checks: relevant tests, lint, typecheck, and production build when scripts exist. For browser projects, check JavaScript syntax and confirm local asset paths.",
+    "5. Run the smallest relevant automated checks first. In fast mode, skip a full production build unless the request changes build configuration, dependencies, or runtime-critical code. Do not install packages or run broad test suites unless needed. In complete/deep mode, run relevant tests and type checks; run a production build when framework, configuration, or runtime behavior changes.",
     "6. Read test/build output. Fix failures caused by your changes and rerun the relevant checks. Do not claim a check passed unless its command completed successfully.",
     "7. Inspect the final diff and confirm that only files inside /workspace/project were changed.",
     "8. Finish with a concise Portuguese summary of files changed, checks actually executed, results, and any remaining limitation.",
