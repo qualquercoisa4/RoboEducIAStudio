@@ -97,3 +97,10 @@ test("transpiles TypeScript entry modules and resolves typed local imports", () 
   assert.match(result, /https:\/\/roboeduc\.local\/src\/player\.ts/);
   assert.doesNotMatch(result, /const player: Player/);
 });
+
+test("rewrites local imports inside inline module scripts", () => {
+  const html = '<html><head></head><body><script type="module">import { Player } from "./src/player.js"; window.Player = Player;</script></body></html>';
+  const result = buildWorkspacePreview(html, [{ path: "src/player.js", content: "export class Player {}" }]);
+  assert.match(result, /https:\/\/roboeduc\.local\/src\/player\.js/);
+  assert.match(result, /<script type="module">/);
+});
