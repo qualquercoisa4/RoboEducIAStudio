@@ -196,6 +196,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const inventoryRef = useRef<Record<ItemId, number>>({ ...STARTING_INVENTORY });
   const selectedRef = useRef(0);
   const actionsRef = useRef<{ mine?: () => void; place?: () => void; eat?: () => void; interact?: () => void }>({});
+  const eatAppleRef = useRef<() => void>(() => {});
   const [inventory, setInventory] = useState<Record<ItemId, number>>({ ...STARTING_INVENTORY });
   const [selected, setSelected] = useState(0);
   const [hud, setHud] = useState({ health: 20, hunger: 20, day: 1, clock: "08:00", night: false });
@@ -212,7 +213,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [craftOpen, setCraftOpen] = useState(false);
   const [furnaceOpen, setFurnaceOpen] = useState(false);
-  const [locked, setLocked] = useState(false);
+  const [craftingTableAvailable, setCraftingTableAvailable] = useState(false);
+  const [furnaceAvailable, setFurnaceAvailable] = useState(false);
+  const [robotBenchAvailable, setRobotBenchAvailable] = useState(false);
   const [notice, setNotice] = useState("Colete madeira, minério e sobreviva à noite.");
   const [gameOver, setGameOver] = useState(false);
   const [restart, setRestart] = useState(0);
@@ -358,6 +361,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     craftingTableAvailableRef.current = false;
     furnaceAvailableRef.current = false;
     robotBenchAvailableRef.current = false;
+    setCraftingTableAvailable(false);
+    setFurnaceAvailable(false);
+    setRobotBenchAvailable(false);
     setHud({ health: 20, hunger: 20, day: 1, clock: "08:00", night: false });
     setGameOver(false);
     setStarted(false);
@@ -383,14 +389,20 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   };
 
   useEffect(() => {
+    eatAppleRef.current = eatApple;
+  });
+
+  useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
 
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
-    } catch {
-      setNotice("Não foi possível iniciar o WebGL neste navegador ou dispositivo.");
+    } catch (error) {
+      console.error("Não foi possível iniciar o WebGL:", error);
+      mount.textContent = "Não foi possível iniciar o WebGL neste navegador ou dispositivo.";
+      mount.setAttribute("role", "alert");
       return;
     }
 
@@ -589,8 +601,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     let spawnTimer = 0;
     let mobDamageCooldown = 0;
     let hudTimer = 0;
-    let lastTime = performance.now();
+    let lastTime = 0;
     let animationFrame = 0;
+    let readyFrame = 0;
     let destroyed = false;
     let touchPointer: number | null = null;
     let lastTouchX = 0;
@@ -694,7 +707,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       if (!target || !target.hit.face) return;
       const item = HOTBAR[selectedRef.current];
       if (item === "apple") {
-        eatApple();
+        eatAppleRef.current();
         return;
       }
       const blockType = PLACEABLE_BLOCKS[item];
@@ -717,9 +730,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       }
       putBlock(x, y, z, blockType);
       rebuildWorld();
-      if (item === "crafting_table") craftingTableAvailableRef.current = true;
-      if (item === "furnace") furnaceAvailableRef.current = true;
-      if (item === "robot_bench") robotBenchAvailableRef.current = true;
+      if (item === "crafting_table") { craftingTableAvailableRef.current = true; setCraftingTableAvailable(true); }
+      if (item === "furnace") { furnaceAvailableRef.current = true; setFurnaceAvailable(true); }
+      if (item === "robot_bench") { robotBenchAvailableRef.current = true; setRobotBenchAvailable(true); }
       updateInventory(item, -1);
       setNotice(ITEM_NAMES[item] + " colocado.");
     };
@@ -740,7 +753,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
         setNotice("Aponte para uma bancada ou fornalha para interagir.");
       }
     };
-    const eatSelected = () => eatApple();
+    const eatSelected = () => eatAppleRef.current();
     actionsRef.current = { mine: mineBlock, place: placeBlock, eat: eatSelected, interact };
 
     const updateCamera = () => {
@@ -769,7 +782,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       if (key >= "1" && key <= "8") chooseSlot(Number(key) - 1);
       if (key === "e" && !event.repeat) toggleInventory();
       if (key === "c" && !event.repeat) toggleCrafting();
-      if (key === "f") eatApple();
+      if (key === "f") actionsRef.current.eat?.();
       if (key === "r" && !event.repeat) actionsRef.current.interact?.();
       if (key === "escape" && document.pointerLockElement === renderer.domElement) document.exitPointerLock();
     };
@@ -787,7 +800,6 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       player.pitch -= event.movementY * 0.0022;
       player.pitch = Math.max(-1.48, Math.min(1.48, player.pitch));
     };
-    const onPointerLock = () => setLocked(document.pointerLockElement === renderer.domElement);
     const onMouseDown = (event: MouseEvent) => {
       if (event.button === 0) mineBlock();
       if (event.button === 2) placeBlock();
@@ -835,7 +847,6 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
-    document.addEventListener("pointerlockchange", onPointerLock);
     window.addEventListener("resize", resize);
     resize();
 
@@ -966,16 +977,16 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       animationFrame = window.requestAnimationFrame(animate);
     };
     animationFrame = window.requestAnimationFrame(animate);
-    setWorldReady(true);
+    readyFrame = window.requestAnimationFrame(() => setWorldReady(true));
 
     return () => {
+      window.cancelAnimationFrame(readyFrame);
       destroyed = true;
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", resize);
-      document.removeEventListener("pointerlockchange", onPointerLock);
       renderer.domElement.removeEventListener("mousedown", onMouseDown);
       renderer.domElement.removeEventListener("contextmenu", onContextMenu);
       renderer.domElement.removeEventListener("pointerdown", onTouchStart);
@@ -1008,14 +1019,11 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   };
 
   const canCraft = (recipe: Recipe) => {
-    if (recipe.needsTable && inventory.crafting_table < 1 && !craftingTableAvailableRef.current) return false;
-    if (recipe.needsFurnace && inventory.furnace < 1 && !furnaceAvailableRef.current) return false;
-    if (recipe.needsRobotBench && inventory.robot_bench < 1 && !robotBenchAvailableRef.current) return false;
+    if (recipe.needsTable && inventory.crafting_table < 1 && !craftingTableAvailable) return false;
+    if (recipe.needsFurnace && inventory.furnace < 1 && !furnaceAvailable) return false;
+    if (recipe.needsRobotBench && inventory.robot_bench < 1 && !robotBenchAvailable) return false;
     return Object.entries(recipe.costs).every(([id, amount]) => inventory[id as ItemId] >= (amount || 0));
   };
-
-  const selectedItem = HOTBAR[selected];
-  const selectedAmount = inventory[selectedItem] || 0;
 
   return (
     <main className="mc-game">

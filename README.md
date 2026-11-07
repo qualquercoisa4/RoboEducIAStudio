@@ -1,31 +1,46 @@
-# RoboEduc IA Studio
+# RoboEduc AI Studio
 
-MVP educacional construído com Next.js e WebLLM.
+Aplicação educacional com chatbot RoboEduc AI, edição de projetos por IA e Game Studio em `/studio`.
 
-## Inferência local
+## Chatbot e provedores de IA
 
-O navegador executa o modelo `Qwen2-0.5B-Instruct-q4f16_1-MLC` com WebGPU. Não exige API key, conta externa ou variável secreta. As mensagens são processadas localmente.
+O chatbot usa a rota de servidor `/api/chat` para chamar o provedor selecionado. A chave fica no servidor e não é enviada ao navegador.
 
-## Primeiro uso
+### Provedor principal
 
-1. Abra o site em navegador e dispositivo compatíveis com WebGPU.
-2. Clique em **Carregar IA neste dispositivo**.
-3. Aguarde o download inicial do modelo.
-4. Envie uma mensagem.
+Configure `OPENROUTER_API_KEY` na Vercel para habilitar o modelo padrão **Qwen3 Coder Next** e os modelos alternativos disponíveis no seletor.
 
-O download é feito uma vez e o navegador pode armazenar o modelo em cache. O modelo é pequeno e sua qualidade é inferior à de modelos de nuvem maiores. A compatibilidade e o desempenho dependem da GPU, memória e navegador. Alguns celulares não oferecem WebGPU.
+### Provedores opcionais
 
-## Desenvolvimento
+- **Cloudflare Workers AI:** configure `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN`.
+- **Google Gemini:** configure `GEMINI_API_KEY`.
+- **OpenAI:** configure `OPENAI_API_KEY` se for habilitar um modelo OpenAI compatível no cliente e no servidor.
+
+As variáveis devem estar configuradas nos ambientes Vercel que serão usados (`Production`, `Preview` e/ou `Development`). Depois de alterar variáveis, gere um novo deployment para que as funções recebam os valores atualizados.
+
+A rota `/api/status` informa quais provedores estão configurados sem expor chaves ou valores secretos.
+
+## Edição de projetos por IA
+
+O Workspace em `/workspace` envia o snapshot do projeto e as operações planejadas ao servidor. O servidor valida caminhos, operações e conteúdo antes de enviar o conjunto ao editor para aplicação. Os testes automatizados desse protocolo ficam em `tests/workspace-patch.test.mjs`.
+
+## Game Studio
+
+Acesse `/studio` para usar o criador de jogos. O projeto também inclui o componente de sobrevivência voxel `MinecraftSurvival`, integrado ao Game Studio.
+
+## Desenvolvimento local
+
+Crie um arquivo `.env.local` com as variáveis do provedor escolhido e execute:
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Privacidade e limitações
+## Validação
 
-- A geração ocorre no próprio navegador; os prompts não são enviados a uma API de IA.
-- O primeiro carregamento baixa pesos do modelo de infraestrutura pública MLC/Hugging Face.
-- O histórico fica no armazenamento local do navegador.
-- É necessário suporte a WebGPU.
-- As rotas antigas em `app/api` são legadas e não são usadas pela interface local.
+```bash
+npm run test:workspace
+npm run lint
+npm run build
+```
