@@ -185,6 +185,25 @@ async function readCloudflareStream(response: Response, onToken?: (chunk: string
   const decoder = new TextDecoder();
   let buffer = "";
   let answer = "";
+  const citations = new Map<string, string>();
+
+  const collectCitations = (payload: unknown) => {
+    if (!payload || typeof payload !== "object") return;
+    const choices = (payload as {
+      choices?: Array<{
+        message?: { annotations?: Array<{ type?: string; url_citation?: { url?: string; title?: string } }> };
+        delta?: { annotations?: Array<{ type?: string; url_citation?: { url?: string; title?: string } }> };
+      }>;
+    }).choices ?? [];
+    for (const choice of choices) {
+      for (const annotation of [...(choice.message?.annotations ?? []), ...(choice.delta?.annotations ?? [])]) {
+        const citation = annotation.url_citation;
+        if (annotation.type === "url_citation" && citation?.url && /^https?:\/\//i.test(citation.url)) {
+          citations.set(citation.url, citation.title?.trim() || citation.url);
+        }
+      }
+    }
+  };
 
   const consume = (event: string) => {
     for (const line of event.split(/\r?\n/)) {
@@ -212,6 +231,7 @@ async function readCloudflareStream(response: Response, onToken?: (chunk: string
           throw new Error(detail || "O provedor retornou um erro durante o streaming.");
         }
       }
+      collectCitations(parsed);
       const chunk = extractResponse(parsed);
       if (chunk) {
         answer += chunk;
@@ -230,6 +250,13 @@ async function readCloudflareStream(response: Response, onToken?: (chunk: string
   }
   buffer += decoder.decode();
   if (buffer.trim()) consume(buffer);
+
+  if (citations.size) {
+    const sourceSection = "\n\n**Fontes consultadas**\n" +
+      [...citations.entries()].slice(0, 8).map(([url, title]) => "- [" + title.replace(/[\[\]]/g, "") + "](" + url + ")").join("\n");
+    answer += sourceSection;
+    onToken?.(sourceSection);
+  }
   return answer;
 }
 
@@ -406,7 +433,7 @@ async function callModel(
             ? { model: openRouterModel, max_tokens: maxTokens }
             : { max_tokens: maxTokens }),
         ...(!useOpenAI ? { temperature: 0.2, top_p: 0.85 } : {}),
-        ...(useOpenRouter && useWebSearch ? { tools: [{ type: "openrouter:web_search" }] } : {}),
+        ...(useOpenRouter && useWebSearch ? { tools: [{ type: "openrouter:web_search", parameters: { engine: "exa", max_results: 5, max_total_results: 8, search_context_size: "medium", max_uses: 2 } }] } : {}),
         ...((useOpenRouter || useOpenAI) && structuredOutput
           ? { response_format: { type: "json_object" } }
           : {}),
@@ -957,6 +984,15 @@ export async function POST(request: Request) {
     return toEvents(async (send, signal) => {
       const status = (stage: string, detail: string) => send({ type: "status", stage, detail });
       status("context", "Preparando o contexto e os requisitos da solicitação.");
+      const latestUserQuestion = [...messages].reverse().find(item => item.role === "user")?.content ?? "";
+      const normalizedQuestion = latestUserQuestion.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim();
+      const asksOnlyToday = /^(?:que dia e hoje|qual e a data de hoje|qual a data de hoje)[?.!\\s]*$/.test(normalizedQuestion);
+      if (asksOnlyToday && body.structuredOutput !== true) {
+        status("date", "Respondendo com a data oficial calculada no servidor.");
+        send({ type: "token", response: "Hoje é " + currentDate + "." });
+        send({ type: "done" });
+        return;
+      }
 
       if (body.structuredOutput === true) {
         await executeWorkspaceEdit({
@@ -978,16 +1014,27 @@ export async function POST(request: Request) {
 
       status("generation", `Gerando resposta com limite de até ${maxTokens.toLocaleString("pt-BR")} tokens de saída.`);
       const generationTimeout = runtimeRepair ? 60_000 : selectedModel.endsWith(":free") ? 90_000 : selectedModel.startsWith("gemini:") ? 120_000 : 120_000;
-      const latestUserQuestion = [...messages].reverse().find(item => item.role === "user")?.content ?? "";
-      const needsFreshInfo = /\\b(hoje|agora|atual|atualmente|recente|últim[oa]s?|notícias?|presidente|vice-presidente|governo|eleiç|cotação|preço|tempo real|esta semana|este mês|2026)\\b/i.test(latestUserQuestion);
+      const needsFreshInfo = /\b(hoje|agora|atual|atualmente|recente|últim[oa]s?|notícias?|presidente|vice-presidente|governo|eleiç|cotação|preço|tempo real|esta semana|este mês|2026)\b/i.test(latestUserQuestion);
       const canSearch = selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:");
       const searchRequested = Boolean(body.webSearch) || needsFreshInfo;
       const enableSearch = canSearch && searchRequested;
       if (needsFreshInfo && enableSearch) status("freshness", "Solicitando pesquisa para informações que podem ter mudado.");
       else if (needsFreshInfo) status("freshness", "Data atual informada; este modelo não dispõe de pesquisa web nesta solicitação.");
-      const generationInstruction = runtimeRepair
-        ? systemInstruction + "\\n\\nMODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade."
-        : systemInstruction;
+      const searchInstruction = enableSearch
+        ? [
+            "PESQUISA WEB OBRIGATÓRIA NESTA SOLICITAÇÃO:",
+            "A ferramenta openrouter:web_search está habilitada. Antes de responder, pesquise a pergunta quando envolver fatos atuais, datas, cargos públicos, notícias, preços, versões ou informações que possam ter mudado.",
+            "Não responda perguntas atuais apenas com memória de treinamento. Faça pelo menos uma busca pertinente; faça uma segunda busca se a primeira não confirmar o ponto central.",
+            "Baseie as afirmações atuais nos resultados retornados. Diferencie claramente fatos confirmados de informações não verificadas.",
+            "Inclua ao final uma seção Fontes consultadas com os títulos e URLs efetivamente retornados pela pesquisa. Nunca invente fontes, títulos ou endereços.",
+            "Se a pesquisa não retornar evidências suficientes, diga explicitamente que não foi possível confirmar."
+          ].join("\n")
+        : "";
+      const generationInstruction = [
+        systemInstruction,
+        searchInstruction,
+        runtimeRepair ? "MODO DE CORREÇÃO DE EXECUÇÃO: concentre-se nos erros reais informados e no código fornecido. Identifique a causa provável, faça a menor correção que resolva o problema, preserve o restante do projeto e entregue o arquivo completo. Não faça auditoria adicional nem reescreva funcionalidades sem necessidade." : ""
+      ].filter(Boolean).join("\n\n");
       let activeModel = selectedModel;
       let answer = "";
       try {
