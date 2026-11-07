@@ -88,10 +88,15 @@ function makeImportMap(files: WorkspacePreviewFile[], originalHtml: string): str
     if (missing.startsWith(".") || missing.includes("/")) imports[moduleUrl(missing)] = failure;
     else if (!(missing in imports)) imports[missing] = failure;
   }
-  const existing = originalHtml.match(/<script\b[^>]*type\s*=\s*["']importmap["'][^>]*>([\s\S]*?)<\/script\s*>/i);
-  if (existing) {
-    try { const parsed = JSON.parse(existing[1]) as { imports?: Record<string, string> }; Object.assign(imports, parsed.imports ?? {}); } catch {}
+  const scopes: Record<string, Record<string, string>> = {};
+  for (const existing of originalHtml.matchAll(/<script\b[^>]*type\s*=\s*["']importmap["'][^>]*>([\s\S]*?)<\/script\s*>/gi)) {
+    try {
+      const parsed = JSON.parse(existing[1]) as { imports?: Record<string, string>; scopes?: Record<string, Record<string, string>> };
+      Object.assign(imports, parsed.imports ?? {});
+      for (const [scope, entries] of Object.entries(parsed.scopes ?? {})) scopes[scope] = { ...(scopes[scope] ?? {}), ...entries };
+    } catch { /* malformed import maps are ignored; preview diagnostics report unresolved imports */ }
   }
+  return '<script type="importmap">' + JSON.stringify({ imports, ...(Object.keys(scopes).length ? { scopes } : {}) }).replace(/</g, "\\u003c") + "</script>";
   return '<script type="importmap">' + JSON.stringify({ imports }).replace(/</g, "\\u003c") + "</script>";
 }
 function makeDiagnosticsBridge(): string {
