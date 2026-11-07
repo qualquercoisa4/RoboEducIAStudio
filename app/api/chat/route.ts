@@ -1241,7 +1241,7 @@ export async function POST(request: Request) {
   const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim() || "";
 
   try {
-    const body = await request.json() as { messages?: ChatMessage[]; projectFiles?: unknown; systemInstruction?: string; mode?: WorkMode; model?: string; webSearch?: boolean; structuredOutput?: boolean };
+    const body = await request.json() as { messages?: ChatMessage[]; projectFiles?: unknown; systemInstruction?: string; mode?: WorkMode; model?: string; webSearch?: boolean; structuredOutput?: boolean; agentSession?: unknown };
     const allowedModels = ["antigravity", "openrouter:qwen/qwen3-coder-next", "openrouter:qwen/qwen-2.5-coder-32b-instruct", "cloudflare", "recursive/flint-v1.0:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemma-4-31b-it:free", "openai:gpt-5.6-luna", "gemini:gemini-3.8-flash"];
     const selectedModel = typeof body.model === "string" && allowedModels.includes(body.model) ? body.model : "openrouter:qwen/qwen3-coder-next";
     if (selectedModel === "cloudflare" && (!accountId || !apiToken)) {
