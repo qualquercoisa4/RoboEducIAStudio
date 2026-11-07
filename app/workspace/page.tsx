@@ -103,7 +103,7 @@ export default function WorkspacePage(){
  const [model,setModel]=useState("antigravity");
  const [agentSession,setAgentSession]=useState<AgentSession|null>(null);
  const agentControllerRef=useRef<AbortController|null>(null);
- const [mode,setMode]=useState("complete");
+ const [mode,setMode]=useState("fast");
  const [history,setHistory]=useState<{role:string;text:string}[]>([]);
  const [historyReady,setHistoryReady]=useState(false);
  useEffect(()=>{try{const raw=localStorage.getItem(AGENT_SESSION_KEY);if(raw){const parsed=JSON.parse(raw) as AgentSession;if(typeof parsed.environmentId==="string"&&typeof parsed.interactionId==="string")setAgentSession(parsed)}}catch{localStorage.removeItem(AGENT_SESSION_KEY)}},[]);
