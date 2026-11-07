@@ -27,10 +27,10 @@ function moduleUrl(path: string): string { return "https://roboeduc.local/" + pa
 function findModulePath(reference: string, importer: string, files: Map<string, WorkspacePreviewFile>): string | null {
   const normalized = normalizeVirtualPath(reference, importer);
   if (!normalized) return null;
-  const candidates = /\.(?:m?js|cjs)$/i.test(normalized) ? [normalized] : [normalized, normalized + ".js", normalized + ".mjs", normalized + "/index.js"];
+  const candidates = /\.(?:m?js|cjs|ts)$/i.test(normalized) ? [normalized] : [normalized, normalized + ".js", normalized + ".mjs", normalized + ".ts", normalized + "/index.js", normalized + "/index.ts"];
   for (const candidate of candidates) {
     const file = files.get(candidate.toLowerCase());
-    if (file && /\.(?:m?js)$/i.test(file.path)) return file.path;
+    if (file && /\.(?:m?js|ts)$/i.test(file.path)) return file.path;
   }
   return null;
 }
@@ -79,7 +79,7 @@ function makeImportMap(files: WorkspacePreviewFile[], originalHtml: string): str
     "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
   };
-  for (const file of files.filter(item => /\.(?:m?js)$/i.test(item.path))) {
+  for (const file of files.filter(item => /\.(?:m?js|ts)$/i.test(item.path))) {
     imports[moduleUrl(file.path)] = dataModule(rewriteModuleImports(file.content, file.path, byPath, unresolved));
   }
   for (const missing of unresolved) {
@@ -120,11 +120,12 @@ export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[
     if (!src) return tag;
     const path = normalizeVirtualPath(src);
     const file = path ? byPath.get(path.toLowerCase()) : undefined;
-    if (!file || !/\.(?:m?js|cjs)$/i.test(file.path)) return tag;
+    if (!file || !/\.(?:m?js|cjs|ts)$/i.test(file.path)) return tag;
     const openingTag = tag.match(/^<script\b([^>]*)>/i)?.[1] ?? "";
     const isModule = /\btype\s*=\s*(?:"module"|'module'|module)/i.test(openingTag);
     const attributes = openingTag.replace(/\s+src\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, "").replace(/\s+(?:integrity|crossorigin|referrerpolicy|async|defer)\b(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/gi, "");
-    const code = isModule ? rewriteModuleImports(file.content, file.path, byPath, new Set()) : file.content;
+    const source = isModule && file.path.toLowerCase().endsWith(".ts") ? ts.transpileModule(file.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText : file.content;
+    const code = isModule ? rewriteModuleImports(source, file.path, byPath, new Set()) : source;
     return '<script' + attributes + ' data-roboeduc-file="' + file.path + '">\n' + escapeInlineScript(code) + '\n</script>';
   });
   document = document.replace(/<script\b[^>]*type\s*=\s*["']importmap["'][^>]*>[\s\S]*?<\/script\s*>/i, "");
