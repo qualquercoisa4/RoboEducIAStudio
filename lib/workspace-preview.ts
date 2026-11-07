@@ -26,15 +26,15 @@ function inlineCssImports(source: string, importer: string, files: Map<string, W
   const key = importer.toLowerCase();
   if (visited.has(key)) return "";
   visited.add(key);
-  return source.replace(/@import\\s+(?:url\\(\\s*)?(['"]?)([^'")\\s;]+)\\1\\s*\\)?([^;]*);/gi,
+  return source.replace(/@import\s+(?:url\(\s*)?(['"]?)([^'")\s;]+)\1\s*\)?([^;]*);/gi,
     (whole, _quote: string, reference: string, media: string) => {
-      if (/^(?:[a-z][a-z0-9+.-]*:|\\/\\/|#)/i.test(reference)) return whole;
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(reference)) return whole;
       const path = normalizeVirtualPath(reference, importer);
       const imported = path ? files.get(path.toLowerCase()) : undefined;
-      if (!imported || !/\\.css$/i.test(imported.path)) return whole;
+      if (!imported || !/\.css$/i.test(imported.path)) return whole;
       const nested = inlineCssImports(imported.content, imported.path, files, visited);
       const condition = String(media ?? "").trim();
-      return condition ? "@media " + condition + "{\\n" + nested + "\\n}" : "\\n" + nested + "\\n";
+      return condition ? "@media " + condition + "{\n" + nested + "\n}" : "\n" + nested + "\n";
     });
 }
 
