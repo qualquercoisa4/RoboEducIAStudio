@@ -975,12 +975,13 @@ async function executeAntigravityWorkspaceEdit(args: {
   } finally {
     try { streamReader.releaseLock(); } catch {}
   }
-  if (!streamCompleted || !finalInteraction) {
+  const completedInteraction = finalInteraction as AgentInteraction | null;
+  if (!streamCompleted || !completedInteraction) {
     throw new Error("O fluxo de execução foi interrompido antes da conclusão. O agente pode continuar trabalhando em segundo plano; tente retomar a sessão.");
   }
-  interactionId = finalInteraction.id || interactionId;
-  environmentId = finalInteraction.environment_id || environmentId;
-  const interaction = finalInteraction;
+  interactionId = completedInteraction.id || interactionId;
+  environmentId = completedInteraction.environment_id || environmentId;
+  const interaction = completedInteraction;
   if (!interactionId || !environmentId) {
     throw new Error("O Google concluiu o agente, mas não retornou os identificadores necessários para recuperar o projeto.");
   }
