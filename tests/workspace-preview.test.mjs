@@ -68,7 +68,7 @@ test("reports unresolved local module imports with a readable preview error", ()
 
 test("does not rewrite import-like text inside comments and strings", () => {
   const html = '<html><head></head><body><script type="module" src="src/main.js"></script></body></html>';
-  const code = 'const example = "import \\"./missing.js\\"";\\n// import "./also-missing.js";\\nexport const ready = true;';
+  const code = 'const example = "import \\"./missing.js\\"";\n// import "./also-missing.js";\nexport const ready = true;';
   const result = buildWorkspacePreview(html, [{ path: "src/main.js", content: code }]);
   assert.match(result, /import \\\"\\.\/missing\\.js/);
   assert.doesNotMatch(result, /also-missing/);
@@ -77,7 +77,7 @@ test("does not rewrite import-like text inside comments and strings", () => {
 
 test("rewrites export-from and dynamic local imports", () => {
   const html = '<html><head></head><body><script type="module" src="src/main.js"></script></body></html>';
-  const code = 'export { Player } from "./player.js";\\nconst load = () => import("./lazy.js");';
+  const code = 'export { Player } from "./player.js";\nconst load = () => import("./lazy.js");';
   const result = buildWorkspacePreview(html, [
     { path: "src/main.js", content: code },
     { path: "src/player.js", content: "export class Player {}" },
