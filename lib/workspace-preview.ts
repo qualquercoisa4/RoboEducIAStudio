@@ -133,7 +133,7 @@ export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[
     const rewritten = rewriteModuleImports(source, "index.html", byPath, new Set());
     return "<script" + attributes + ">\n" + escapeInlineScript(rewritten) + "\n</script>";
   });
-  document = document.replace(/<script\b[^>]*type\s*=\s*["']importmap["'][^>]*>[\s\S]*?<\/script\s*>/i, "");
+  document = document.replace(/<script\b[^>]*type\s*=\s*["']importmap["'][^>]*>[\s\S]*?<\/script\s*>/gi, "");
   const importMap = makeImportMap(files, html);
   if (/<head\b[^>]*>/i.test(document)) document = document.replace(/<head\b[^>]*>/i, match => match + importMap + makeDiagnosticsBridge());
   else if (/<html\b[^>]*>/i.test(document)) document = document.replace(/<html\b[^>]*>/i, match => match + "<head>" + importMap + makeDiagnosticsBridge() + "</head>");
