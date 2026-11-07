@@ -1,5 +1,4 @@
 export type WorkspacePreviewFile = { path: string; content: string };
-
 function readAttribute(tag: string, name: string): string | null {
   const escaped = name.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
   const match = tag.match(new RegExp("\\b" + escaped + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", "i"));
@@ -7,36 +6,36 @@ function readAttribute(tag: string, name: string): string | null {
 }
 function normalizeVirtualPath(reference: string, basePath = "index.html"): string | null {
   const value = reference.trim();
-  if (!value || /^(?:[a-z][a-z0-9+.-]*:|\\/\\/|#)/i.test(value)) return null;
+  if (!value || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(value)) return null;
   let decoded = value.split(/[?#]/, 1)[0];
   try { decoded = decodeURIComponent(decoded); } catch {}
   const base = value.startsWith("/") ? [] : basePath.split("/").slice(0, -1);
   const normalized: string[] = [];
-  for (const segment of [...base, ...decoded.replace(/^\\/+/, "").split("/")]) {
+  for (const segment of [...base, ...decoded.replace(/^\/+/, "").split("/")]) {
     if (!segment || segment === ".") continue;
     if (segment === "..") { if (!normalized.length) return null; normalized.pop(); }
     else normalized.push(segment);
   }
   return normalized.join("/");
 }
-function escapeInlineScript(source: string): string { return source.replace(/<\\/script/gi, "<\\\\/script"); }
-function escapeInlineStyle(source: string): string { return source.replace(/<\\/style/gi, "<\\\\/style"); }
+function escapeInlineScript(source: string): string { return source.replace(/<\/script/gi, "<\\/script"); }
+function escapeInlineStyle(source: string): string { return source.replace(/<\/style/gi, "<\\/style"); }
 function dataModule(source: string): string { return "data:text/javascript;charset=utf-8," + encodeURIComponent(source); }
 function moduleUrl(path: string): string { return "https://roboeduc.local/" + path.split("/").map(encodeURIComponent).join("/"); }
 function findModulePath(reference: string, importer: string, files: Map<string, WorkspacePreviewFile>): string | null {
   const normalized = normalizeVirtualPath(reference, importer);
   if (!normalized) return null;
-  const candidates = /\\.(?:m?js|cjs)$/i.test(normalized) ? [normalized] : [normalized, normalized + ".js", normalized + ".mjs", normalized + "/index.js"];
+  const candidates = /\.(?:m?js|cjs)$/i.test(normalized) ? [normalized] : [normalized, normalized + ".js", normalized + ".mjs", normalized + "/index.js"];
   for (const candidate of candidates) {
     const file = files.get(candidate.toLowerCase());
-    if (file && /\\.(?:m?js)$/i.test(file.path)) return file.path;
+    if (file && /\.(?:m?js)$/i.test(file.path)) return file.path;
   }
   return null;
 }
 function rewriteModuleImports(source: string, importer: string, files: Map<string, WorkspacePreviewFile>, unresolved: Set<string>): string {
-  return source.replace(/((?:\\bfrom\\s*|\\bimport\\s*\\(\\s*|^\\s*import\\s*)["'])([^"']+)(["'])/gm,
+  return source.replace(/((?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s*)["'])([^"']+)(["'])/gm,
     (whole, before: string, specifier: string, after: string) => {
-      if (/^(?:[a-z][a-z0-9+.-]*:|\\/\\/|#)/i.test(specifier)) return whole;
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(specifier)) return whole;
       if (specifier.startsWith(".") || specifier.startsWith("/")) {
         const target = findModulePath(specifier, importer, files);
         if (target) return before + moduleUrl(target) + after;
@@ -55,7 +54,7 @@ function makeImportMap(files: WorkspacePreviewFile[], originalHtml: string): str
     "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
   };
-  for (const file of files.filter(item => /\\.(?:m?js)$/i.test(item.path))) {
+  for (const file of files.filter(item => /\.(?:m?js)$/i.test(item.path))) {
     imports[moduleUrl(file.path)] = dataModule(rewriteModuleImports(file.content, file.path, byPath, unresolved));
   }
   for (const missing of unresolved) {
@@ -64,11 +63,11 @@ function makeImportMap(files: WorkspacePreviewFile[], originalHtml: string): str
     if (missing.startsWith(".") || missing.includes("/")) imports[moduleUrl(missing)] = failure;
     else if (!(missing in imports)) imports[missing] = failure;
   }
-  const existing = originalHtml.match(/<script\\b[^>]*type\\s*=\\s*["']importmap["'][^>]*>([\\s\\S]*?)<\\/script\\s*>/i);
+  const existing = originalHtml.match(/<script\b[^>]*type\s*=\s*["']importmap["'][^>]*>([\s\S]*?)<\/script\s*>/i);
   if (existing) {
     try { const parsed = JSON.parse(existing[1]) as { imports?: Record<string, string> }; Object.assign(imports, parsed.imports ?? {}); } catch {}
   }
-  return '<script type="importmap">' + JSON.stringify({ imports }).replace(/</g, "\\\\u003c") + "</script>";
+  return '<script type="importmap">' + JSON.stringify({ imports }).replace(/</g, "\\u003c") + "</script>";
 }
 function makeDiagnosticsBridge(): string {
   return '<script>(()=>{' +
@@ -82,30 +81,30 @@ function makeDiagnosticsBridge(): string {
 export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[]): string {
   const byPath = new Map(files.map(file => [file.path.toLowerCase(), file]));
   let document = html;
-  document = document.replace(/<link\\b[^>]*>/gi, tag => {
+  document = document.replace(/<link\b[^>]*>/gi, tag => {
     const href = readAttribute(tag, "href");
     if (!href) return tag;
     const path = normalizeVirtualPath(href);
     const file = path ? byPath.get(path.toLowerCase()) : undefined;
-    if (!file || !/\\.css$/i.test(file.path)) return tag;
+    if (!file || !/\.css$/i.test(file.path)) return tag;
     const media = readAttribute(tag, "media");
-    return '<style data-roboeduc-file="' + file.path + '"' + (media ? ' media="' + media.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + '"' : "") + '>\\n' + escapeInlineStyle(file.content) + '\\n</style>';
+    return '<style data-roboeduc-file="' + file.path + '"' + (media ? ' media="' + media.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + '"' : "") + '>\n' + escapeInlineStyle(file.content) + '\n</style>';
   });
-  document = document.replace(/<script\\b[^>]*\\bsrc\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)[^>]*>\\s*<\\/script\\s*>/gi, tag => {
+  document = document.replace(/<script\b[^>]*\bsrc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)[^>]*>\s*<\/script\s*>/gi, tag => {
     const src = readAttribute(tag, "src");
     if (!src) return tag;
     const path = normalizeVirtualPath(src);
     const file = path ? byPath.get(path.toLowerCase()) : undefined;
-    if (!file || !/\\.(?:m?js|cjs)$/i.test(file.path)) return tag;
-    const openingTag = tag.match(/^<script\\b([^>]*)>/i)?.[1] ?? "";
-    const isModule = /\\btype\\s*=\\s*(?:"module"|'module'|module)/i.test(openingTag);
-    const attributes = openingTag.replace(/\\s+src\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)/i, "").replace(/\\s+(?:integrity|crossorigin|referrerpolicy|async|defer)\\b(?:\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+))?/gi, "");
+    if (!file || !/\.(?:m?js|cjs)$/i.test(file.path)) return tag;
+    const openingTag = tag.match(/^<script\b([^>]*)>/i)?.[1] ?? "";
+    const isModule = /\btype\s*=\s*(?:"module"|'module'|module)/i.test(openingTag);
+    const attributes = openingTag.replace(/\s+src\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, "").replace(/\s+(?:integrity|crossorigin|referrerpolicy|async|defer)\b(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/gi, "");
     const code = isModule ? rewriteModuleImports(file.content, file.path, byPath, new Set()) : file.content;
-    return '<script' + attributes + ' data-roboeduc-file="' + file.path + '">\\n' + escapeInlineScript(code) + '\\n</script>';
+    return '<script' + attributes + ' data-roboeduc-file="' + file.path + '">\n' + escapeInlineScript(code) + '\n</script>';
   });
   const importMap = makeImportMap(files, html);
-  if (/<head\\b[^>]*>/i.test(document)) document = document.replace(/<head\\b[^>]*>/i, match => match + importMap + makeDiagnosticsBridge());
-  else if (/<html\\b[^>]*>/i.test(document)) document = document.replace(/<html\\b[^>]*>/i, match => match + "<head>" + importMap + makeDiagnosticsBridge() + "</head>");
+  if (/<head\b[^>]*>/i.test(document)) document = document.replace(/<head\b[^>]*>/i, match => match + importMap + makeDiagnosticsBridge());
+  else if (/<html\b[^>]*>/i.test(document)) document = document.replace(/<html\b[^>]*>/i, match => match + "<head>" + importMap + makeDiagnosticsBridge() + "</head>");
   else document = '<!doctype html><html lang="pt-BR"><head>' + importMap + makeDiagnosticsBridge() + "</head><body>" + document + "</body></html>";
   return document;
 }
