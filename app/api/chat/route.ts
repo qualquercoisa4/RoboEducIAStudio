@@ -896,14 +896,14 @@ async function executeAntigravityWorkspaceEdit(args: {
     interaction = next;
     environmentId = interaction.environment_id || environmentId;
   }
-  const finalState = interaction.status.toLowerCase();
-  if (finalState !== "completed" && finalState !== "succeeded") {
-    throw new Error("O Antigravity Agent encerrou com estado " + interaction.status + ": " + (interaction.error?.message || interaction.output_text || "nenhuma alteração foi aplicada."));
+  const finalInteractionId = interaction.id;
+  const finalState = interaction.status?.toLowerCase() ?? "";
+  if (!finalInteractionId || (finalState !== "completed" && finalState !== "succeeded")) {
+    throw new Error("O Antigravity Agent encerrou com estado " + (interaction.status || "desconhecido") + ": " + (interaction.error?.message || interaction.output_text || "nenhuma alteração foi aplicada."));
   }
 
-  send({ type: "agent_session", environmentId, interactionId: interaction.id });
+  send({ type: "agent_session", environmentId, interactionId: finalInteractionId });
   status("agent-executed", "O agente concluiu a etapa autônoma. Recuperando os arquivos e conferindo o resultado.");
-  const environmentId = interaction.environment_id;
   const listResponse = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/environments/" + encodeURIComponent(environmentId) + "/files?recursive=true",
     { headers: { "x-goog-api-key": apiKey }, cache: "no-store", signal: controller }
