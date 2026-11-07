@@ -119,3 +119,15 @@ test("merges multiple import maps and preserves scoped imports", () => {
   assert.ok(result.includes('"scopes":{"https://cdn.example/"'));
   assert.equal((result.match(/type="importmap"/g) ?? []).length, 1);
 });
+
+test("inlines nested local CSS imports and keeps external imports", () => {
+  const html = '<html><head><link rel="stylesheet" href="src/style.css"></head><body></body></html>';
+  const files = [
+    { path: "src/style.css", content: '@import "./theme/colors.css";\\n@import url("https://cdn.example/remote.css");\\nmain{display:grid}' },
+    { path: "src/theme/colors.css", content: ':root{--accent:#4598d1}' }
+  ];
+  const result = buildWorkspacePreview(html, files);
+  assert.match(result, /--accent:#4598d1/);
+  assert.match(result, /https:\/\/cdn\.example\/remote\.css/);
+  assert.doesNotMatch(result, /@import "\.\/theme\/colors\.css"/);
+});
