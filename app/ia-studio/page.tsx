@@ -302,7 +302,7 @@ export default function Home() {
       <section className="chat-main">
         <header className="chat-top">
           <button className="mobile-menu" onClick={() => setSidebar(true)} aria-label="Abrir menu">☰</button>
-          <div>Assistente inteligente <span>BETA</span></div>
+          <div className="chat-heading">RoboEduc <strong>IA Studio</strong></div>
           <a href="/workspace">Área de trabalho ↗</a>
         </header>
 
@@ -356,38 +356,38 @@ export default function Home() {
 
         <div className="composer-area">
           {error && <div className="error-banner">{error}<button onClick={() => setError("")}>Fechar</button></div>}
-          <details className="model-settings">
-            <summary>
-              <span>MODELO</span>
-              <strong>{selectedModel === "openrouter:qwen/qwen3-coder-next" ? "Qwen3 Coder Next" : selectedModel === "cloudflare" ? "Qwen3 30B · Cloudflare" : selectedModel.startsWith("gemini:") ? "Gemini 3.8 Flash" : selectedModel.split("/").at(-1)?.replace(":free", "")}</strong>
-              <i aria-hidden="true">⌄</i>
-            </summary>
-            <div className="model-picker" aria-label="Modelo de inteligência artificial">
-              <label htmlFor="model-choice">SELECIONAR MODELO</label>
-              <select id="model-choice" value={selectedModel} onChange={event => setSelectedModel(event.target.value)} disabled={loading}>
-                <option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next · Principal para código</option>
-                <option value="cloudflare">Qwen3 30B · Cloudflare (reserva)</option>
-                <option value="recursive/flint-v1.0:free">Flint · OpenRouter grátis</option>
-                <option value="cohere/north-mini-code:free">North Mini Code · OpenRouter grátis</option>
-                <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra · OpenRouter grátis</option>
-                <option value="google/gemma-4-31b-it:free">Gemma 4 31B · OpenRouter grátis</option>
-                <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash · Google (nível gratuito)</option>
-              </select>
+          <div className="chat-toolbar">
+            <div className="mode-selector" aria-label="Nível de processamento">
+              <button type="button" className={mode === "fast" ? "selected" : ""} onClick={() => setMode("fast")} disabled={loading} title="Respostas rápidas">Rápido</button>
+              <button type="button" className={mode === "complete" ? "selected" : ""} onClick={() => setMode("complete")} disabled={loading} title="Equilíbrio entre velocidade e qualidade">Completo</button>
+              <button type="button" className={mode === "deep" ? "selected" : ""} onClick={() => setMode("deep")} disabled={loading} title="Tarefas complexas">Profundo</button>
             </div>
-          </details>
-          {selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:") && (
-            <div className="web-search-toggle">
-              <label><input type="checkbox" checked={webSearch} onChange={event => setWebSearch(event.target.checked)} disabled={loading || !openRouterReady} /> Pesquisar na internet</label>
-              <small>Opcional. A pesquisa pode gerar cobrança adicional do mecanismo de busca; desligada por padrão.</small>
-            </div>
-          )}
-          <div className="mode-selector" aria-label="Nível de processamento">
-            <span>PROCESSAMENTO</span>
-            <div>
-              <button type="button" className={mode === "fast" ? "selected" : ""} onClick={() => setMode("fast")} disabled={loading} title="Respostas rápidas e perguntas simples">Rápido</button>
-              <button type="button" className={mode === "complete" ? "selected" : ""} onClick={() => setMode("complete")} disabled={loading} title="Equilíbrio entre qualidade e consumo">Completo</button>
-              <button type="button" className={mode === "deep" ? "selected" : ""} onClick={() => setMode("deep")} disabled={loading} title="Maior limite de saída para tarefas complexas">Profundo</button>
-            </div>
+            <details className="model-settings">
+              <summary title="Alterar modelo e opções">
+                <span className="settings-symbol" aria-hidden="true">⚙</span>
+                <strong>{selectedModel === "openrouter:qwen/qwen3-coder-next" ? "Qwen3 Coder Next" : selectedModel === "cloudflare" ? "Qwen3 30B" : selectedModel.startsWith("gemini:") ? "Gemini" : selectedModel.split("/").at(-1)?.replace(":free", "")}</strong>
+                <i aria-hidden="true">⌄</i>
+              </summary>
+              <div className="model-picker" aria-label="Modelo de inteligência artificial">
+                <label htmlFor="model-choice">MODELO DE IA</label>
+                <select id="model-choice" value={selectedModel} onChange={event => setSelectedModel(event.target.value)} disabled={loading}>
+                  <option value="openrouter:qwen/qwen3-coder-next">Qwen3 Coder Next · Código</option>
+                  <option value="cloudflare">Qwen3 30B · Cloudflare</option>
+                  <option value="recursive/flint-v1.0:free">Flint · Grátis</option>
+                  <option value="cohere/north-mini-code:free">North Mini Code · Grátis</option>
+                  <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra · Grátis</option>
+                  <option value="google/gemma-4-31b-it:free">Gemma 4 31B · Grátis</option>
+                  <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash</option>
+                </select>
+                {selectedModel !== "cloudflare" && selectedModel !== "openai:gpt-5.6-luna" && !selectedModel.startsWith("gemini:") && (
+                  <label className="compact-web-search">
+                    <input type="checkbox" checked={webSearch} onChange={event => setWebSearch(event.target.checked)} disabled={loading || !openRouterReady} />
+                    Pesquisar na internet
+                    <small>Ativa busca para todas as perguntas. Perguntas sobre fatos atuais podem acionar busca automaticamente. O provedor pode cobrar pela pesquisa.</small>
+                  </label>
+                )}
+              </div>
+            </details>
           </div>
           <div className="composer">
             <textarea
@@ -403,8 +403,7 @@ export default function Home() {
               ? <button className="send stop" onClick={stop} aria-label="Parar geração">■</button>
               : <button className="send" disabled={!input.trim()} onClick={() => void send()} aria-label="Enviar mensagem">↑</button>}
           </div>
-          <div className="composer-help">Enter para enviar · Shift + Enter para nova linha</div>
-          <div className="fine-print">O modo Profundo pode consumir mais Neurons. Códigos HTML podem ser executados em um ambiente isolado.</div>
+
         </div>
       </section>
     </main>
