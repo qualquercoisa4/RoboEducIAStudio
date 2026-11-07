@@ -735,7 +735,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     "- For 3D games, validate renderer initialization, camera, resize handling, movement, collision, pointer/touch input, and performance. Do not use desktop-only PointerLockControls as the only control scheme; implement touch look and virtual controls when mobile is in scope.",
     "- For voxel games, avoid one Mesh per block for large worlds. Use chunking, instancing or merged geometry; implement deterministic block coordinates, raycast targeting, placement/removal, and collision against actual terrain.",
     "- Add smoke tests or automated checks for the critical interaction loop. Run the dev server/build and inspect browser console output when tools permit.",
-    "- Do not report a prototype as functional unless it has been executed and its main interaction has been verified. Clearly distinguish code inspection from runtime verification."
+    "- Do not report a prototype as functional unless it has been executed and its main interaction has been verified. Clearly distinguish code inspection from runtime verification.",
     "",
     "## Safety and scope",
     "- Do not read, print, copy, or request API keys, environment secrets, credentials, or personal data.",
