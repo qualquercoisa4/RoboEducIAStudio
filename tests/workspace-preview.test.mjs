@@ -68,7 +68,9 @@ test("reports unresolved local module imports with a readable preview error", ()
 
 test("does not rewrite import-like text inside comments and strings", () => {
   const html = '<html><head></head><body><script type="module" src="src/main.js"></script></body></html>';
-  const code = 'const example = "import \\"./missing.js\\"";\n// import "./also-missing.js";\nexport const ready = true;';
+  const code = `const example = "import "./missing.js"";
+// import "./also-missing.js";
+export const ready = true;`;
   const result = buildWorkspacePreview(html, [{ path: "src/main.js", content: code }]);
   assert.match(result, /import \\\"\\.\/missing\\.js/);
   assert.doesNotMatch(result, /also-missing/);
@@ -90,7 +92,9 @@ test("rewrites export-from and dynamic local imports", () => {
 test("transpiles TypeScript entry modules and resolves typed local imports", () => {
   const html = '<html><head></head><body><script type="module" src="src/main.ts"></script></body></html>';
   const result = buildWorkspacePreview(html, [
-    { path: "src/main.ts", content: 'import { Player } from "./player";\\nconst player: Player = new Player();\\nwindow.player = player;' },
+    { path: "src/main.ts", content: `import { Player } from "./player";
+const player: Player = new Player();
+window.player = player;` },
     { path: "src/player.ts", content: 'export class Player { ready = true; }' }
   ]);
   assert.match(result, /<script type="module" data-roboeduc-file="src\/main\.ts">/);
