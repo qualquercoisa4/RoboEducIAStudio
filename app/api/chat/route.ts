@@ -980,7 +980,7 @@ async function executeAntigravityWorkspaceEdit(args: {
   }
   interactionId = finalInteraction.id || interactionId;
   environmentId = finalInteraction.environment_id || environmentId;
-  interaction = finalInteraction;
+  const interaction = finalInteraction;
   if (!interactionId || !environmentId) {
     throw new Error("O Google concluiu o agente, mas não retornou os identificadores necessários para recuperar o projeto.");
   }
