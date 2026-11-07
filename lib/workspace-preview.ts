@@ -96,7 +96,8 @@ function makeImportMap(files: WorkspacePreviewFile[], originalHtml: string): str
     "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
   };
   for (const file of files.filter(item => /\.(?:m?js|ts)$/i.test(item.path))) {
-    imports[moduleUrl(file.path)] = dataModule(rewriteModuleImports(file.content, file.path, byPath, unresolved));
+    const source = file.path.toLowerCase().endsWith(".ts") ? ts.transpileModule(file.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText : file.content;
+    imports[moduleUrl(file.path)] = dataModule(rewriteModuleImports(source, file.path, byPath, unresolved));
   }
   for (const missing of unresolved) {
     const message = "Dependência ou módulo não disponível no preview: " + missing + ". Verifique o caminho ou use uma URL CDN/import map compatível.";
