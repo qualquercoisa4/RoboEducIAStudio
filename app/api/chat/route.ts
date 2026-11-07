@@ -864,6 +864,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     throw new Error("Falha no Antigravity Agent: " + detail);
   }
   if (!interaction?.id) throw new Error("O Antigravity Agent não retornou o identificador da interação.");
+  let interactionId = interaction.id;
   environmentId = interaction.environment_id || environmentId;
   if (!environmentId) throw new Error("O Antigravity Agent não retornou o identificador do sandbox.");
 
@@ -884,7 +885,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     }
     await new Promise(resolve => setTimeout(resolve, 2_500));
     const pollResponse = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/interactions/" + encodeURIComponent(interaction.id),
+      "https://generativelanguage.googleapis.com/v1beta/interactions/" + encodeURIComponent(interactionId),
       { headers: { "x-goog-api-key": apiKey }, cache: "no-store", signal: controller }
     );
     if (!pollResponse.ok) {
@@ -894,9 +895,10 @@ async function executeAntigravityWorkspaceEdit(args: {
     const next = await pollResponse.json().catch(() => null) as AgentInteraction | null;
     if (!next?.id) throw new Error("O Google retornou um estado inválido para a interação do agente.");
     interaction = next;
+    interactionId = next.id;
     environmentId = interaction.environment_id || environmentId;
   }
-  const finalInteractionId = interaction.id;
+  const finalInteractionId = interactionId;
   const finalState = interaction.status?.toLowerCase() ?? "";
   if (!finalInteractionId || (finalState !== "completed" && finalState !== "succeeded")) {
     throw new Error("O Antigravity Agent encerrou com estado " + (interaction.status || "desconhecido") + ": " + (interaction.error?.message || interaction.output_text || "nenhuma alteração foi aplicada."));
