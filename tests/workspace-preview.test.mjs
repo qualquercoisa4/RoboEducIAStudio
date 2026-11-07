@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 const source = readFileSync(new URL("../lib/workspace-preview.ts", import.meta.url), "utf8");
 const javascript = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 }
-}).outputText;
+}).outputText.replace('from "typescript";', 'from "' + import.meta.resolve("typescript") + '";');
 const { buildWorkspacePreview } = await import("data:text/javascript;base64," + Buffer.from(javascript).toString("base64"));
 
 test("embeds local CSS paths with relative prefixes and query strings", () => {
