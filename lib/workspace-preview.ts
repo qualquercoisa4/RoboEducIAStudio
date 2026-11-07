@@ -128,6 +128,11 @@ export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[
     const code = isModule ? rewriteModuleImports(source, file.path, byPath, new Set()) : source;
     return '<script' + attributes + ' data-roboeduc-file="' + file.path + '">\n' + escapeInlineScript(code) + '\n</script>';
   });
+  document = document.replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi, (tag, attributes: string, source: string) => {
+    if (!/\btype\s*=\s*(?:"module"|'module'|module)/i.test(attributes) || /\bsrc\s*=/.test(attributes)) return tag;
+    const rewritten = rewriteModuleImports(source, "index.html", byPath, new Set());
+    return "<script" + attributes + ">\n" + escapeInlineScript(rewritten) + "\n</script>";
+  });
   document = document.replace(/<script\b[^>]*type\s*=\s*["']importmap["'][^>]*>[\s\S]*?<\/script\s*>/i, "");
   const importMap = makeImportMap(files, html);
   if (/<head\b[^>]*>/i.test(document)) document = document.replace(/<head\b[^>]*>/i, match => match + importMap + makeDiagnosticsBridge());
