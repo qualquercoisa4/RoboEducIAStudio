@@ -86,3 +86,14 @@ test("rewrites export-from and dynamic local imports", () => {
   assert.equal((result.match(/https:\\/\\/roboeduc\\.local\\/src\\/(?:player|lazy)\\.js/g) ?? []).length, 2);
 });
 
+
+test("transpiles TypeScript entry modules and resolves typed local imports", () => {
+  const html = '<html><head></head><body><script type="module" src="src/main.ts"></script></body></html>';
+  const result = buildWorkspacePreview(html, [
+    { path: "src/main.ts", content: 'import { Player } from "./player";\\nconst player: Player = new Player();\\nwindow.player = player;' },
+    { path: "src/player.ts", content: 'export class Player { ready = true; }' }
+  ]);
+  assert.match(result, /<script type="module" data-roboeduc-file="src\/main\.ts">/);
+  assert.match(result, /https:\/\/roboeduc\.local\/src\/player\.ts/);
+  assert.doesNotMatch(result, /const player: Player/);
+});
