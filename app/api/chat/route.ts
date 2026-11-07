@@ -970,7 +970,7 @@ export async function POST(request: Request) {
       "Nunca invente links, fontes, pesquisas ou alegue ter verificado algo sem resultados efetivos.",
       "Se não houver resultado de pesquisa, informe claramente que o fato atual não pôde ser confirmado.",
       "Não apresente páginas conhecidas como fontes efetivamente consultadas se nenhuma consulta ocorreu."
-    ].join("\\n");
+    ].join("\n");
     const systemInstruction = requestedInstruction + "\n\n" + temporalContext + "\n\n" + QUALITY_RULES + getTaskPlaybook(messages);
     const mode: WorkMode = body.mode === "fast" || body.mode === "deep" ? body.mode : "complete";
     const codeTask = isLikelyCodeTask(messages);
