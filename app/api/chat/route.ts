@@ -901,6 +901,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     throw new Error("O Antigravity Agent encerrou com estado " + interaction.status + ": " + (interaction.error?.message || interaction.output_text || "nenhuma alteração foi aplicada."));
   }
 
+  send({ type: "agent_session", environmentId, interactionId: interaction.id });
   status("agent-executed", "O agente concluiu a etapa autônoma. Recuperando os arquivos e conferindo o resultado.");
   const environmentId = interaction.environment_id;
   const listResponse = await fetch(
@@ -915,10 +916,12 @@ async function executeAntigravityWorkspaceEdit(args: {
   if (!Array.isArray(listing.files)) throw new Error("A sandbox retornou uma listagem de arquivos inválida.");
 
   const prefix = "workspace/project/";
+  const ignoredDirectories = new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", "coverage", "dist", "build", ".cache"]);
   const remoteFiles = listing.files
     .filter(file => file.type === "FILE" && typeof file.path === "string")
     .map(file => ({ ...file, path: file.path!.replace(/^\/+/, "") }))
-    .filter(file => file.path.startsWith(prefix));
+    .filter(file => file.path.startsWith(prefix))
+    .filter(file => !file.path.slice(prefix.length).split("/").some(segment => ignoredDirectories.has(segment.toLowerCase())));
   if (remoteFiles.length > 80) throw new Error("O agente gerou mais de 80 arquivos. A aplicação foi cancelada para manter o projeto dentro dos limites do editor.");
 
   const nextProject = new Map<string, string>();
