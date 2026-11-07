@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run test:workspace && next build",
     "start": "next start",
     "lint": "eslint .",
     "test:workspace": "node --test tests/workspace-patch.test.mjs tests/workspace-preview.test.mjs tests/html-validation.test.mjs"
