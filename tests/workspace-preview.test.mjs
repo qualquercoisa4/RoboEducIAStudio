@@ -63,5 +63,5 @@ test("resolves Three.js bare imports and its addon package through an import map
 test("reports unresolved local module imports with a readable preview error", () => {
   const html = '<html><head></head><body><script type="module" src="src/main.js"></script></body></html>';
   const result = buildWorkspacePreview(html, [{ path: "src/main.js", content: 'import "./missing.js";' }]);
-  assert.match(result, /Módulo não disponível no preview|Dependência ou módulo não disponível no preview/);
+  assert.match(result, /Depend%C3%AAncia%20ou%20m%C3%B3dulo%20n%C3%A3o%20dispon%C3%ADvel%20no%20preview/);
 });
