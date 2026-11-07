@@ -114,8 +114,8 @@ test("rewrites local imports inside inline module scripts", () => {
 test("merges multiple import maps and preserves scoped imports", () => {
   const html = '<html><head><script type="importmap">{"imports":{"pkg":"https://cdn.example/pkg.js"}}</script><script type="importmap">{"imports":{"other":"https://cdn.example/other.js"},"scopes":{"https://cdn.example/":{"dep":"https://cdn.example/dep.js"}}}</script></head><body></body></html>';
   const result = buildWorkspacePreview(html, []);
-  assert.match(result, /"pkg":"https:\\/\\/cdn\.example\\/pkg\.js"/);
-  assert.match(result, /"other":"https:\\/\\/cdn\.example\\/other\.js"/);
-  assert.match(result, /"scopes":\{"https:\\/\\/cdn\.example\\/"/);
+  assert.ok(result.includes('"pkg":"https://cdn.example/pkg.js"'));
+  assert.ok(result.includes('"other":"https://cdn.example/other.js"'));
+  assert.ok(result.includes('"scopes":{"https://cdn.example/"'));
   assert.equal((result.match(/type="importmap"/g) ?? []).length, 1);
 });
