@@ -783,18 +783,71 @@ async function executeAntigravityWorkspaceEdit(args: {
 
   status("agent-bootstrap", "Preparando uma sandbox Linux isolada com o projeto e as instruções de engenharia.");
   const controller = AbortSignal.any([signal, AbortSignal.timeout(240_000)]);
+  let environmentId = agentSession?.environmentId ?? "";
+  if (agentSession) {
+    status("agent-sync", "Atualizando o sandbox persistente com a versão atual dos arquivos.");
+    const uploads = [
+      { path: ".agents/AGENTS.md", content: agentRules },
+      { path: "workspace/roboeduc-workspace-manifest.json", content: manifest },
+      ...projectFiles.map(file => ({ path: "workspace/project/" + file.path, content: file.content }))
+    ];
+    for (let offset = 0; offset < uploads.length; offset += 5) {
+      if (signal.aborted) throw new Error("A operação foi cancelada antes de iniciar o agente.");
+      const batch = uploads.slice(offset, offset + 5);
+      await Promise.all(batch.map(async upload => {
+        const encodedPath = upload.path.split("/").map(segment => encodeURIComponent(segment)).join("/");
+        const response = await fetch(
+          "https://generativelanguage.googleapis.com/upload/v1beta/environments/" +
+            encodeURIComponent(environmentId) + "/files/" + encodedPath + "?overwrite=true",
+          {
+            method: "PUT",
+            headers: { "x-goog-api-key": apiKey, "Content-Type": "text/plain; charset=utf-8" },
+            body: upload.content,
+            cache: "no-store",
+            signal: controller
+          }
+        );
+        if (!response.ok) {
+          const detail = await response.text().catch(() => "");
+          throw new Error("Não foi possível sincronizar " + upload.path + " no sandbox persistente (HTTP " + response.status + "). " + detail.slice(0, 300));
+        }
+      }));
+      status("agent-sync", "Arquivos sincronizados no sandbox (" + Math.min(offset + batch.length, uploads.length) + "/" + uploads.length + ").");
+    }
+  } else {
+    status("agent-bootstrap", "Preparando uma sandbox Linux isolada com o projeto e as instruções de engenharia.");
+  }
+
+  type AgentInteraction = {
+    id?: string;
+    environment_id?: string;
+    status?: string;
+    output_text?: string;
+    error?: { message?: string };
+    steps?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+  };
   let interactionResponse: Response;
   try {
+    const requestBody: Record<string, unknown> = {
+      agent: "antigravity-preview-09-2026",
+      agent_config: {
+        type: "antigravity",
+        model: mode === "fast" ? "gemini-3.5-flash-lite" : "gemini-3.8-flash"
+      },
+      system_instruction: "You are an autonomous senior software engineer. Use the sandbox tools to inspect, edit, run, test, debug, and verify the user's project. Follow the mounted .agents/AGENTS.md instructions exactly. Always ground completion claims in actual command results.",
+      input: [{ type: "text", text: prompt }],
+      background: true
+    };
+    if (agentSession) {
+      requestBody.environment = environmentId;
+      requestBody.previous_interaction_id = agentSession.interactionId;
+    } else {
+      requestBody.environment = { type: "remote", sources };
+    }
     interactionResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        agent: "antigravity-preview-09-2026",
-        agent_config: { type: "antigravity", model: "gemini-3.8-flash" },
-        system_instruction: "You are an autonomous senior software engineer. Use the sandbox tools to inspect, edit, run, test, debug, and verify the user's project. Follow the mounted .agents/AGENTS.md instructions exactly. Always ground completion claims in actual command results.",
-        input: [{ type: "text", text: prompt }],
-        environment: { type: "remote", sources }
-      }),
+      body: JSON.stringify(requestBody),
       cache: "no-store",
       signal: controller
     });
@@ -805,23 +858,47 @@ async function executeAntigravityWorkspaceEdit(args: {
       : "Não foi possível iniciar o Antigravity Agent: " + (error instanceof Error ? error.message : String(error)));
   }
 
-  const interaction = await interactionResponse.json().catch(() => null) as {
-    id?: string;
-    environment_id?: string;
-    status?: string;
-    output_text?: string;
-    error?: { message?: string };
-    steps?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
-  } | null;
+  let interaction = await interactionResponse.json().catch(() => null) as AgentInteraction | null;
   if (!interactionResponse.ok) {
     const detail = interaction?.error?.message || "Google Gemini retornou HTTP " + interactionResponse.status + ".";
     throw new Error("Falha no Antigravity Agent: " + detail);
   }
-  if (!interaction?.environment_id || !interaction.id) {
-    throw new Error("O Antigravity Agent não retornou os identificadores da interação e da sandbox.");
+  if (!interaction?.id) throw new Error("O Antigravity Agent não retornou o identificador da interação.");
+  environmentId = interaction.environment_id || environmentId;
+  if (!environmentId) throw new Error("O Antigravity Agent não retornou o identificador do sandbox.");
+
+  const terminalStates = new Set(["completed", "succeeded", "failed", "cancelled", "canceled", "expired", "incomplete"]);
+  const deadline = Date.now() + 220_000;
+  let lastStepCount = -1;
+  while (!interaction.status || !terminalStates.has(interaction.status.toLowerCase())) {
+    if (signal.aborted) throw new Error("A solicitação foi cancelada durante a execução do agente.");
+    if (Date.now() >= deadline) {
+      throw new Error("O Antigravity Agent ainda estava trabalhando após o limite de 220 segundos. A sessão foi preservada; tente continuar em uma nova mensagem.");
+    }
+    const stepCount = Array.isArray(interaction.steps) ? interaction.steps.length : 0;
+    if (stepCount !== lastStepCount) {
+      lastStepCount = stepCount;
+      status("agent-running", stepCount
+        ? "Antigravity executando e usando ferramentas · " + stepCount + " etapa(s) registrada(s)."
+        : "Antigravity está analisando o projeto e executando ferramentas na sandbox.");
+    }
+    await new Promise(resolve => setTimeout(resolve, 2_500));
+    const pollResponse = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/interactions/" + encodeURIComponent(interaction.id),
+      { headers: { "x-goog-api-key": apiKey }, cache: "no-store", signal: controller }
+    );
+    if (!pollResponse.ok) {
+      const detail = await pollResponse.text().catch(() => "");
+      throw new Error("Não foi possível acompanhar a execução do Antigravity Agent (HTTP " + pollResponse.status + "). " + detail.slice(0, 400));
+    }
+    const next = await pollResponse.json().catch(() => null) as AgentInteraction | null;
+    if (!next?.id) throw new Error("O Google retornou um estado inválido para a interação do agente.");
+    interaction = next;
+    environmentId = interaction.environment_id || environmentId;
   }
-  if (interaction.status && !["completed", "succeeded"].includes(interaction.status.toLowerCase())) {
-    throw new Error("O Antigravity Agent encerrou com estado " + interaction.status + ". Nenhuma alteração foi aplicada.");
+  const finalState = interaction.status.toLowerCase();
+  if (finalState !== "completed" && finalState !== "succeeded") {
+    throw new Error("O Antigravity Agent encerrou com estado " + interaction.status + ": " + (interaction.error?.message || interaction.output_text || "nenhuma alteração foi aplicada."));
   }
 
   status("agent-executed", "O agente concluiu a etapa autônoma. Recuperando os arquivos e conferindo o resultado.");
