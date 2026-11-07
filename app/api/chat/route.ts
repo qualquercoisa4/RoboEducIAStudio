@@ -985,7 +985,7 @@ export async function POST(request: Request) {
       const status = (stage: string, detail: string) => send({ type: "status", stage, detail });
       status("context", "Preparando o contexto e os requisitos da solicitação.");
       const latestUserQuestion = [...messages].reverse().find(item => item.role === "user")?.content ?? "";
-      const normalizedQuestion = latestUserQuestion.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim();
+      const normalizedQuestion = latestUserQuestion.normalize("NFD").replace(/\\p{Diacritic}/gu, "").toLowerCase().trim();
       const asksOnlyToday = /^(?:que dia e hoje|qual e a data de hoje|qual a data de hoje)[?.!\\s]*$/.test(normalizedQuestion);
       if (asksOnlyToday && body.structuredOutput !== true) {
         status("date", "Respondendo com a data oficial calculada no servidor.");
