@@ -1028,10 +1028,9 @@ async function executeAntigravityWorkspaceEdit(args: {
     assertSafeWorkspacePath(relativePath);
     const declaredSize = Number(remoteFile.size_bytes ?? 0);
     if (declaredSize > 120_000) throw new Error("O arquivo " + relativePath + " excedeu o limite de 120.000 bytes do editor.");
-    if (remoteFile.mime_type && !/^(?:text\/|application\/(?:json|javascript|xml|typescript|x-javascript)|image\/svg\+xml)/i.test(remoteFile.mime_type)) {
-      throw new Error("O agente gerou um arquivo binário não suportado pelo editor de texto: " + relativePath + ". A alteração foi cancelada para não perder o recurso.");
-    }
-
+    // Do not trust MIME metadata for text files: dotfiles such as .gitignore
+    // are frequently labelled application/octet-stream by remote file services.
+    // Strict UTF-8 decoding plus a NUL-byte check is the reliable text/binary gate.
     status("agent-sync", "Sincronizando " + relativePath + " (" + (index + 1) + "/" + remoteFiles.length + ").");
     const encodedPath = remoteFile.path.split("/").map(segment => encodeURIComponent(segment)).join("/");
     const downloadResponse = await fetch(
@@ -1041,6 +1040,9 @@ async function executeAntigravityWorkspaceEdit(args: {
     if (!downloadResponse.ok) throw new Error("Falha ao baixar " + relativePath + " da sandbox (HTTP " + downloadResponse.status + ").");
     const bytes = await downloadResponse.arrayBuffer();
     if (bytes.byteLength > 120_000) throw new Error("O arquivo " + relativePath + " excedeu o limite de tamanho do editor.");
+    if (new Uint8Array(bytes).some(byte => byte === 0)) {
+      throw new Error("O agente gerou um arquivo binário não suportado pelo editor de texto: " + relativePath + ". Nenhuma alteração foi aplicada.");
+    }
     let content: string;
     try {
       content = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
