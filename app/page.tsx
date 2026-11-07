@@ -174,7 +174,7 @@ export default function Home() {
         <a className="prompt-brand" href="/" aria-label="RoboEduc Game Creator">
           <span className="prompt-brand-robo">ROBO</span><span className="prompt-brand-educ"><i>E</i><i>D</i><i>U</i><i>C</i></span><small>GAME CREATOR</small>
         </a>
-        <a className="main-site-link" href="https://poa.roboeduc.com.br/" target="_blank" rel="noreferrer">Site da RoboEduc <span>↗</span></a>
+        <nav className="prompt-header-actions" aria-label="Navegação principal"><a className="ia-studio-link" href="/studio">IA Studio <span>✦</span></a><a className="main-site-link" href="https://poa.roboeduc.com.br/" target="_blank" rel="noreferrer">Site da RoboEduc <span>↗</span></a></nav>
       </header>
 
       <section className="prompt-content">
