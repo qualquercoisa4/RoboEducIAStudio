@@ -1,3 +1,5 @@
+import ts from "typescript";
+
 export type WorkspacePreviewFile = { path: string; content: string };
 function readAttribute(tag: string, name: string): string | null {
   const escaped = name.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
@@ -33,19 +35,42 @@ function findModulePath(reference: string, importer: string, files: Map<string, 
   return null;
 }
 function rewriteModuleImports(source: string, importer: string, files: Map<string, WorkspacePreviewFile>, unresolved: Set<string>): string {
-  return source.replace(/((?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s*)["'])([^"']+)(["'])/gm,
-    (whole, before: string, specifier: string, after: string) => {
-      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(specifier)) return whole;
-      if (specifier.startsWith(".") || specifier.startsWith("/")) {
-        const target = findModulePath(specifier, importer, files);
-        if (target) return before + moduleUrl(target) + after;
-        const missing = normalizeVirtualPath(specifier, importer);
-        if (missing) unresolved.add(missing);
-        return before + (missing ? moduleUrl(missing) : specifier) + after;
+  // Parse module syntax so comments and ordinary strings are never rewritten.
+  const parsed = ts.createSourceFile(importer, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.JS);
+  const edits: Array<{ start: number; end: number; value: string }> = [];
+  const rewriteSpecifier = (literal: ts.StringLiteralLike) => {
+    const specifier = literal.text;
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(specifier)) return;
+    if (specifier.startsWith(".") || specifier.startsWith("/")) {
+      const target = findModulePath(specifier, importer, files);
+      if (target) {
+        edits.push({ start: literal.getStart(parsed) + 1, end: literal.getEnd() - 1, value: moduleUrl(target) });
+        return;
       }
-      if (specifier !== "three" && !specifier.startsWith("three/addons/")) unresolved.add(specifier);
-      return whole;
-    });
+      const missing = normalizeVirtualPath(specifier, importer);
+      if (missing) {
+        unresolved.add(missing);
+        edits.push({ start: literal.getStart(parsed) + 1, end: literal.getEnd() - 1, value: moduleUrl(missing) });
+      }
+      return;
+    }
+    if (specifier !== "three" && !specifier.startsWith("three/addons/")) unresolved.add(specifier);
+  };
+  const visit = (node: ts.Node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      if (node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) rewriteSpecifier(node.moduleSpecifier);
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0])) {
+      rewriteSpecifier(node.arguments[0]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+  let output = source;
+  for (const edit of edits.sort((a, b) => b.start - a.start)) {
+    output = output.slice(0, edit.start) + edit.value + output.slice(edit.end);
+  }
+  return output;
 }
 function makeImportMap(files: WorkspacePreviewFile[], originalHtml: string): string {
   const byPath = new Map(files.map(file => [file.path.toLowerCase(), file]));
