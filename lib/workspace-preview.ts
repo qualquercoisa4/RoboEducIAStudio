@@ -128,7 +128,9 @@ function makeDiagnosticsBridge(): string {
     'window.addEventListener("error",event=>{counters.error++;const target=event.target;const resource=target&&(target.src||target.href);const location=event.filename?" — "+event.filename+(event.lineno?":"+event.lineno)+(event.colno?":"+event.colno):"";send("error",{message:resource?"Falha ao carregar recurso: "+resource:(event.message||"Erro JavaScript")+location});report()},true);' +
     'window.addEventListener("unhandledrejection",event=>{counters.error++;const reason=event.reason;send("error",{message:reason&&(reason.stack||reason.message)||reason||"Promise rejeitada"});report()});' +
     'const originalError=console.error.bind(console);console.error=(...args)=>{counters.error++;send("error",{message:args.map(value=>typeof value==="string"?value:(()=>{try{return JSON.stringify(value)}catch{return String(value)}})()).join(" ")});originalError(...args);report()};' +
-    'const start=()=>{send("ready",{message:"Prévia carregada"});report();setInterval(report,1500)};if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();})();</script>';
+    'let startedOnce=false;const start=()=>{if(startedOnce)return;startedOnce=true;send("ready",{message:"Prévia carregada"});report();setInterval(report,1500)};' +
+    'window.addEventListener("message",event=>{if(event.data&&event.data.__roboeducWorkspacePreviewPing===true){start();report()}});' +
+    'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();})();</script>';
 }
 /** Builds an isolated preview document and resolves virtual ES module imports. */
 export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[]): string {
