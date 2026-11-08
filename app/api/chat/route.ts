@@ -958,6 +958,7 @@ async function executeAntigravityWorkspaceEdit(args: {
   let streamBuffer = "";
   let lastProgressKey = "";
   let streamCompleted = false;
+  const executionEvidence: string[] = [];
   const stepLabels: Record<string, string> = {
     thought: "Analisando a solicitação e o projeto",
     model_output: "Preparando a próxima ação",
@@ -997,9 +998,11 @@ async function executeAntigravityWorkspaceEdit(args: {
       return;
     }
     if (eventType === "step.start") {
-      const step = event.step && typeof event.step === "object" ? event.step as { type?: unknown } : null;
+      const step = event.step && typeof event.step === "object" ? event.step as { type?: unknown; name?: unknown } : null;
       const type = typeof step?.type === "string" ? step.type : "tool_call";
-      const detail = (stepLabels[type] || "Executando etapa: " + type.replace(/[_-]+/g, " ")) + ".";
+      const name = typeof step?.name === "string" ? " (" + step.name + ")" : "";
+      executionEvidence.push("INÍCIO: " + type + name);
+      const detail = (stepLabels[type] || "Executando etapa: " + type.replace(/[_-]+/g, " ")) + name + ".";
       if (detail !== lastProgressKey) { lastProgressKey = detail; status("agent-step", detail); }
       return;
     }
@@ -1007,16 +1010,23 @@ async function executeAntigravityWorkspaceEdit(args: {
       const delta = event.delta && typeof event.delta === "object" ? event.delta as Record<string, unknown> : null;
       const content = delta?.content && typeof delta.content === "object" ? delta.content as Record<string, unknown> : null;
       const kind = typeof delta?.type === "string" ? delta.type : "";
+      if (kind === "tool_call" || kind === "tool_result" || kind === "code_execution") {
+        const serialized = content ? JSON.stringify(content) : "";
+        const entry = kind.toUpperCase() + (serialized ? ": " + serialized.slice(0, 2_500) : ": evento recebido sem conteúdo textual.");
+        executionEvidence.push(entry);
+        if (executionEvidence.length > 80) executionEvidence.shift();
+      }
       const detail = kind === "tool_call"
         ? "O agente está preparando uma ferramenta."
-        : kind === "tool_result"
-          ? "Ferramenta executada; analisando o resultado."
+        : kind === "tool_result" || kind === "code_execution"
+          ? "Resultado de ferramenta recebido; registrando evidências."
           : "";
       if (detail && detail !== lastProgressKey) { lastProgressKey = detail; status("agent-step", detail); }
-      void content;
       return;
     }
     if (eventType === "step.stop") {
+      const step = event.step && typeof event.step === "object" ? event.step as { type?: unknown } : null;
+      executionEvidence.push("FIM DA ETAPA: " + (typeof step?.type === "string" ? step.type : "etapa"));
       status("agent-step-complete", "Etapa concluída. O agente está avançando para a próxima.");
       return;
     }
@@ -1151,11 +1161,15 @@ async function executeAntigravityWorkspaceEdit(args: {
   const finalFiles = [...nextProject.entries()].map(([path, content]) => ({ path, content }));
   validateProjectFiles(finalFiles);
   const agentSummary = typeof interaction.output_text === "string" && interaction.output_text.trim()
-    ? interaction.output_text.trim().slice(0, 4_000)
-    : "O Antigravity Agent concluiu a tarefa e sincronizou os arquivos do projeto.";
+    ? interaction.output_text.trim().slice(0, 3_200)
+    : "Arquivos recuperados e sincronizados. O provedor não retornou um relatório textual de conclusão; portanto, nenhum teste é considerado aprovado apenas pela conclusão da tarefa.";
+  const evidenceSummary = executionEvidence.length
+    ? "\n\n**Registro de execução recebido do agente**\n" + executionEvidence.slice(-24).map((entry, index) => (index + 1) + ". " + entry).join("\n")
+    : "\n\n**Evidências de execução:** o fluxo não forneceu detalhes de chamadas ou resultados de ferramentas. Não é possível confirmar quais testes foram executados.";
+  const finalAgentSummary = (agentSummary + evidenceSummary).slice(0, 7_500);
 
   status("agent-validated", "Os arquivos foram recuperados e passaram pela validação estrutural. Preparando a aplicação atômica.");
-  send({ type: "plan", summary: agentSummary, operations });
+  send({ type: "plan", summary: finalAgentSummary, operations });
   for (const operation of operations) {
     if (operation.action === "delete") continue;
     const content = nextProject.get(operation.path);
@@ -1170,7 +1184,7 @@ async function executeAntigravityWorkspaceEdit(args: {
   for (const operation of operations) {
     if (operation.action !== "delete") fileLengths[operation.path] = nextProject.get(operation.path)?.length ?? 0;
   }
-  send({ type: "apply", summary: agentSummary, operations, fileLengths });
+  send({ type: "apply", summary: finalAgentSummary, operations, fileLengths });
 }
 
 async function executeWorkspaceEdit(args: {
