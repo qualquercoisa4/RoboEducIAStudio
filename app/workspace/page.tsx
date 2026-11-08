@@ -3,12 +3,15 @@
 import "./workspace.css";
 import Link from "next/link";
 import { buildWorkspacePreview } from "@/lib/workspace-preview";
+import { MarkdownMessage } from "@/lib/markdown-message";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 type ProjectFile = { path: string; content: string; updatedAt: number };
 type Project = { name: string; files: ProjectFile[] };
 type WorkspaceOperation = { path: string; action: "create" | "update" | "delete"; reason: string };
 type WorkspaceStreamEvent = { type?: unknown; [key: string]: unknown };
+type AgentProgress = {index:number;stepType:string;label:string;state:"running"|"completed"};
+type TokenUsage = {totalTokens:number;inputTokens:number;outputTokens:number;thoughtTokens:number};
 type Tab = "chat" | "code" | "preview";
 type AgentSession = { environmentId: string; interactionId: string };
 const AGENT_SESSION_KEY = "roboeduc-antigravity-session-v1";
@@ -113,6 +116,9 @@ export default function WorkspacePage(){
  const [mode,setMode]=useState("fast");
  const [history,setHistory]=useState<{role:string;text:string}[]>([]);
  const [historyReady,setHistoryReady]=useState(false);
+ const [agentProgress,setAgentProgress]=useState<AgentProgress[]>([]);
+ const [tokenUsage,setTokenUsage]=useState<TokenUsage>({totalTokens:0,inputTokens:0,outputTokens:0,thoughtTokens:0});
+ const [lastRunFiles,setLastRunFiles]=useState<WorkspaceOperation[]>([]);
  useEffect(()=>{try{const raw=localStorage.getItem(AGENT_SESSION_KEY);if(raw){const parsed=JSON.parse(raw) as AgentSession;if(typeof parsed.environmentId==="string"&&typeof parsed.interactionId==="string")setAgentSession(parsed)}}catch{localStorage.removeItem(AGENT_SESSION_KEY)}},[]);
  useEffect(()=>{try{const raw=localStorage.getItem(AGENT_HISTORY_KEY);if(raw){const parsed=JSON.parse(raw) as unknown;if(Array.isArray(parsed)){const safe=parsed.filter((item):item is {role:string;text:string}=>Boolean(item&&typeof item==="object"&&(item as {role?:unknown}).role&&(item as {text?:unknown}).text&&["user","assistant"].includes((item as {role:string}).role)&&typeof (item as {text:unknown}).text==="string")).slice(-60);setHistory(safe)}}}catch{localStorage.removeItem(AGENT_HISTORY_KEY)}finally{setHistoryReady(true)}},[]);
  useEffect(()=>{if(!historyReady)return;try{localStorage.setItem(AGENT_HISTORY_KEY,JSON.stringify(history.slice(-60)))}catch{}},[history,historyReady]);
@@ -130,6 +136,7 @@ export default function WorkspacePage(){
   if(!request||busy)return;
   const snapshot=project.files.map(file=>({path:file.path,content:file.content}));
   setBusy(true);
+  setAgentProgress([]);setTokenUsage({totalTokens:0,inputTokens:0,outputTokens:0,thoughtTokens:0});setLastRunFiles([]);
   const controller=new AbortController();
   agentControllerRef.current=controller;
   setStatus(model==="antigravity"?"Iniciando o Antigravity Agent...":"Analisando os arquivos do projeto...");
@@ -170,6 +177,8 @@ export default function WorkspacePage(){
       event=parsed as WorkspaceStreamEvent;
      }catch{throw new Error("O fluxo SSE contém um evento inválido ou truncado. Nenhuma alteração foi aplicada.")}
     if(event.type==="status"&&typeof event.detail==="string"){setStatus(event.detail);return}
+    if(event.type==="agent_progress"&&typeof event.index==="number"&&typeof event.label==="string"){setAgentProgress(old=>{const next=[...old];const at=next.findIndex(item=>item.index===event.index);const value={index:event.index as number,stepType:String(event.stepType||"step"),label:event.label as string,state:event.state==="completed"?"completed" as const:"running" as const};if(at>=0)next[at]=value;else next.push(value);return next.sort((a,b)=>a.index-b.index)});return}
+    if(event.type==="agent_usage"&&typeof event.totalTokens==="number"){setTokenUsage({totalTokens:event.totalTokens,inputTokens:Number(event.inputTokens)||0,outputTokens:Number(event.outputTokens)||0,thoughtTokens:Number(event.thoughtTokens)||0});return}
     if(event.type==="agent_session"&&typeof event.environmentId==="string"&&typeof event.interactionId==="string"){
      const session={environmentId:event.environmentId,interactionId:event.interactionId};
      setAgentSession(session);
@@ -267,6 +276,7 @@ export default function WorkspacePage(){
     nextMap.set(operation.path,{path:operation.path,content,updatedAt:Date.now()});
    }
    const nextProject={...current,files:[...nextMap.values()].sort((a,b)=>a.path.localeCompare(b.path))};
+   setLastRunFiles(completedApplySignal.operations);
    setProject(nextProject);
    projectRef.current=nextProject;
    setPreviewErrors([]);
@@ -291,6 +301,7 @@ export default function WorkspacePage(){
   <header className="studio-topbar">
    <Link href="/" className="studio-back" aria-label="Voltar ao Game Creator">←</Link>
    <div className="studio-project"><b>{project.name}</b><small>ROBOEDUC AI STUDIO <span>·</span> ÁREA DE TRABALHO</small></div>
+   <div className="studio-token-counter" title={"Entrada: "+tokenUsage.inputTokens+" · Saída: "+tokenUsage.outputTokens+" · Pensamento: "+tokenUsage.thoughtTokens}><b>{tokenUsage.totalTokens.toLocaleString("pt-BR")}</b><small>tokens usados</small></div>
    <span className="studio-cloud-state"><i/> Sandbox de código</span>
    <button onClick={exportFiles}>Exportar</button>
    <button disabled={busy} onClick={()=>{const name=window.prompt("Nome do projeto",project.name);if(name?.trim())setProject(old=>({...old,name:name.trim()}))}}>Renomear</button>
@@ -309,8 +320,8 @@ export default function WorkspacePage(){
     </div>
     <div className="studio-chat-history">
      {history.length===0&&<div className="studio-chat-intro"><div>✦</div><h1>O que vamos construir?</h1><p>Descreva uma ideia ou peça uma alteração. O agente pesquisa exemplos e bibliotecas, reutiliza código verificado, cria projetos modulares e executa testes na sandbox.</p><div className="studio-agent-capabilities"><span>Até 300 arquivos</span><span>100 alterações por tarefa</span><span>Pesquisar GitHub e docs</span><span>Reutilizar bibliotecas</span><span>Executar e testar</span><span>Protótipos 2D e 3D</span></div></div>}
-     {history.map((item,i)=><article key={i} className={"studio-message "+item.role}><b>{item.role==="assistant"?"ROBOEDUC AI":"VOCÊ"}</b><p>{item.text}</p></article>)}
-     {busy&&<article className="studio-message assistant agent-live"><b>ANTIGRAVITY AGENT</b><p className="studio-thinking"><span className="studio-spinner"/> {status}</p></article>}
+     {history.map((item,i)=><article key={i} className={"studio-message "+item.role}><b>{item.role==="assistant"?"ROBOEDUC AI":"VOCÊ"}</b>{item.role==="assistant"?<MarkdownMessage content={item.text}/>:<p>{item.text}</p>}</article>)}
+     {busy&&<article className="studio-message assistant agent-live"><b>ANTIGRAVITY AGENT</b><p className="studio-thinking"><span className="studio-spinner"/> {status}</p>{agentProgress.length>0&&<div className="studio-agent-steps"><div className="studio-agent-steps-title">Etapas da execução</div>{agentProgress.slice(-8).map((step)=><div className={"studio-agent-step "+step.state} key={step.index}><span>{step.state==="completed"?"✓":"◌"}</span><div><b>{step.label}</b><small>{step.stepType.replace(/_/g," ")}</small></div></div>)}</div>}<div className="studio-agent-live-usage">{tokenUsage.totalTokens.toLocaleString("pt-BR")} tokens · {tokenUsage.inputTokens.toLocaleString("pt-BR")} entrada · {tokenUsage.outputTokens.toLocaleString("pt-BR")} saída · {tokenUsage.thoughtTokens.toLocaleString("pt-BR")} pensamento</div></article>}
     </div>
     <div className="studio-chat-composer">
      <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void askAI()}}} placeholder="Descreva o que deseja criar ou modificar..." disabled={busy}/>
@@ -348,6 +359,6 @@ export default function WorkspacePage(){
     {tab==="preview"&&<section className="studio-preview-view">{html?<><iframe key={previewReload} ref={previewFrameRef} title="Prévia do projeto" className="studio-preview-frame" sandbox="allow-scripts allow-forms allow-pointer-lock" srcDoc={preview}/><section className="studio-preview-diagnostics" aria-label="Diagnóstico do preview"><div className="studio-diagnostics-head"><div><b>Diagnóstico do preview</b><small>{previewReady?"Telemetria recebida do documento do jogo":"Aguardando telemetria do jogo"}</small></div><button onClick={()=>{setPreviewInputLog([]);setPreviewErrors([])}}>Limpar registros</button></div>{previewTelemetry?<><div className="studio-preview-metrics">{Object.entries((previewTelemetry.counters||{}) as Record<string,number>).map(([name,value])=><div key={name}><small>{name}</small><b>{value}</b></div>)}</div><div className="studio-preview-metrics"><div><small>Viewport</small><b>{previewTelemetry.viewport?.innerWidth||0} × {previewTelemetry.viewport?.innerHeight||0}</b></div><div><small>Pixel ratio</small><b>{previewTelemetry.viewport?.devicePixelRatio||0}</b></div><div><small>Foco</small><b>{previewTelemetry.document?.hasFocus?"Ativo":"Inativo"}</b></div><div><small>Visibilidade</small><b>{previewTelemetry.document?.visibilityState||"—"}</b></div><div><small>Iframe</small><b>{previewTelemetry.frame?.isTop?"Top":"Incorporado"}</b></div></div><div><b>Canvas detectados</b>{(previewTelemetry.canvas||[]).length?previewTelemetry.canvas.map((canvas:any,index:number)=><small key={index}>Canvas {index+1}: buffer {canvas.width} × {canvas.height}; CSS {Math.round(canvas.cssWidth)} × {Math.round(canvas.cssHeight)}</small>):<small>Nenhum canvas encontrado</small>}</div></>:<p>Abra a aba Prévia para receber os dados reais do documento incorporado.</p>}{previewInputLog.length>0&&<details><summary>Eventos recentes ({previewInputLog.length})</summary><ul>{previewInputLog.map((item,index)=><li key={index}>{item}</li>)}</ul></details>}{previewErrors.length>0&&<div><b>Erros JavaScript e recursos ({previewErrors.length})</b><ul>{previewErrors.map((error,index)=><li key={index}>{error}</li>)}</ul><button className="diagnostics-fix" onClick={()=>void askAI("Corrija os erros reais detectados na prévia deste projeto. Preserve o objetivo e as funcionalidades existentes. Analise os arquivos atuais e altere somente os necessários.\n\nErros do navegador:\n"+previewErrors.map((error,index)=>(index+1)+". "+error).join("\n"))}>Corrigir com IA</button></div>}</section></>:<div className="studio-empty-preview">Projeto sem index.html. <button onClick={()=>setTab("chat")}>Criar com IA</button></div>}</section>}
    </section>
   </div>
-  <footer className="studio-statusbar"><span>● Projeto local</span><span>{files.length} arquivos</span><span>{status}</span></footer>
+  <footer className="studio-statusbar"><span>● Projeto local</span><span>{files.length} arquivos</span><span>{tokenUsage.totalTokens.toLocaleString("pt-BR")} tokens</span><span>{status}</span></footer>
  </main>;
 }
