@@ -894,7 +894,7 @@ async function executeAntigravityWorkspaceEdit(args: {
         model: mode === "fast" ? "gemini-3.5-flash-lite" : "gemini-3.8-flash",
         max_total_tokens: mode === "fast" ? 48_000 : mode === "deep" ? 96_000 : 64_000
       },
-      system_instruction: "You are an autonomous senior software engineer. Use the sandbox tools to inspect, edit, run, test, debug, and verify the user's project. Follow the mounted .agents/AGENTS.md instructions exactly. Always ground completion claims in actual command results. Optimize for useful, complete work with minimal unnecessary exploration. Start editing as soon as you understand the task; do not spend excessive time planning.",
+      system_instruction: "You are an autonomous senior software engineer. Use the sandbox tools to inspect, edit, run, test, debug, and verify the user's project. Follow the mounted .agents/AGENTS.md instructions exactly. Always ground completion claims in actual command results. Optimize for useful, complete work with minimal unnecessary exploration. Start editing as soon as you understand the task; do not spend excessive time planning.\\n\\nMANDATORY FINAL TEXT REPORT: After all edits and checks, you MUST produce a clear, user-facing report in Brazilian Portuguese as your final model output. Do not finish with tool calls only or leave the final answer empty. Include: (1) resumo do que foi feito; (2) arquivos alterados; (3) problemas encontrados e causa; (4) testes/comandos realmente executados e resultados exatos; (5) o que não foi testado ou permanece incerto; (6) como o usuário pode verificar. Never claim tests passed unless actual command output proves it. If no code changes were needed, say so and explain why. This report is required even when the task was only diagnosis or analysis.",
       input: [{ type: "text", text: prompt }],
       background: true,
       stream: true,
@@ -959,6 +959,7 @@ async function executeAntigravityWorkspaceEdit(args: {
   let lastProgressKey = "";
   let streamCompleted = false;
   const executionEvidence: string[] = [];
+  let streamedModelText = "";
   const stepLabels: Record<string, string> = {
     thought: "Analisando a solicitação e o projeto",
     model_output: "Preparando a próxima ação",
@@ -1010,6 +1011,10 @@ async function executeAntigravityWorkspaceEdit(args: {
       const delta = event.delta && typeof event.delta === "object" ? event.delta as Record<string, unknown> : null;
       const content = delta?.content && typeof delta.content === "object" ? delta.content as Record<string, unknown> : null;
       const kind = typeof delta?.type === "string" ? delta.type : "";
+      // Interactions API text deltas are { type: "text", text: "..." }.
+      // They are not nested under delta.content; ignoring this field drops the
+      // agent's entire final report while still recording tool activity.
+      if (kind === "text" && typeof delta?.text === "string") streamedModelText += delta.text;
       if (kind === "tool_call" || kind === "tool_result" || kind === "code_execution") {
         const serialized = content ? JSON.stringify(content) : "";
         const entry = kind.toUpperCase() + (serialized ? ": " + serialized.slice(0, 2_500) : ": evento recebido sem conteúdo textual.");
@@ -1071,11 +1076,24 @@ async function executeAntigravityWorkspaceEdit(args: {
   }
   interactionId = completedInteraction.id || interactionId;
   environmentId = completedInteraction.environment_id || environmentId;
-  const interaction = completedInteraction;
+  let interaction = completedInteraction;
   if (!interactionId || !environmentId) {
     throw new Error("O Google concluiu o agente, mas não retornou os identificadores necessários para recuperar o projeto.");
   }
 
+  // The streaming completion event is partial and may omit output_text/steps.
+  // Fetch the canonical Interaction resource to recover assembled model output.
+  const detailResponse = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/interactions/" + encodeURIComponent(interactionId),
+    { headers: { "x-goog-api-key": apiKey, "Api-Revision": "2026-05-20" }, cache: "no-store", signal: controller }
+  );
+  if (detailResponse.ok) {
+    const detail = await detailResponse.json() as AgentInteraction;
+    interaction = { ...completedInteraction, ...detail };
+  } else {
+    const detail = await detailResponse.text().catch(() => "");
+    executionEvidence.push("AVISO: não foi possível recuperar o objeto completo da interação (HTTP " + detailResponse.status + "). " + detail.slice(0, 300));
+  }
 
   const finalInteractionId = interactionId;
   const finalState = interaction.status?.toLowerCase() ?? "";
@@ -1160,13 +1178,25 @@ async function executeAntigravityWorkspaceEdit(args: {
 
   const finalFiles = [...nextProject.entries()].map(([path, content]) => ({ path, content }));
   validateProjectFiles(finalFiles);
-  const agentSummary = typeof interaction.output_text === "string" && interaction.output_text.trim()
-    ? interaction.output_text.trim().slice(0, 3_200)
-    : "Arquivos recuperados e sincronizados. O provedor não retornou um relatório textual de conclusão; portanto, nenhum teste é considerado aprovado apenas pela conclusão da tarefa.";
+  const stepText = Array.isArray(interaction.steps)
+    ? interaction.steps.filter(step => step.type === "model_output")
+        .flatMap(step => Array.isArray(step.content) ? step.content : [])
+        .filter(part => part.type === "text" && typeof part.text === "string")
+        .map(part => part.text!)
+        .join("")
+    : "";
+  const agentText = [
+    typeof interaction.output_text === "string" ? interaction.output_text : "",
+    stepText,
+    streamedModelText
+  ].map(value => value.trim()).find(Boolean) || "";
+  const agentSummary = agentText
+    ? agentText.slice(0, 5_500)
+    : "O agente concluiu a execução, mas não retornou texto de relatório no fluxo nem no objeto completo da interação. Os arquivos foram recuperados; não será inventado um relatório nem presumida a aprovação dos testes.";
   const evidenceSummary = executionEvidence.length
     ? "\n\n**Registro de execução recebido do agente**\n" + executionEvidence.slice(-24).map((entry, index) => (index + 1) + ". " + entry).join("\n")
     : "\n\n**Evidências de execução:** o fluxo não forneceu detalhes de chamadas ou resultados de ferramentas. Não é possível confirmar quais testes foram executados.";
-  const finalAgentSummary = (agentSummary + evidenceSummary).slice(0, 7_500);
+  const finalAgentSummary = (agentSummary + (agentText ? "" : evidenceSummary)).slice(0, 7_500);
 
   status("agent-validated", "Os arquivos foram recuperados e passaram pela validação estrutural. Preparando a aplicação atômica.");
   send({ type: "plan", summary: finalAgentSummary, operations });
