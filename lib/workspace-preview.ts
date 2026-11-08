@@ -118,11 +118,17 @@ function makeImportMap(files: WorkspacePreviewFile[], originalHtml: string): str
 }
 function makeDiagnosticsBridge(): string {
   return '<script>(()=>{' +
-    'const send=(type,message)=>{try{parent.postMessage({__roboeducWorkspacePreview:true,type,message:String(message??"")},"*")}catch{}};' +
-    'window.addEventListener("error",event=>{const target=event.target;const resource=target&&(target.src||target.href);const location=event.filename?" — "+event.filename+(event.lineno?":"+event.lineno:"")+(event.colno?":"+event.colno:""):"";send("error",resource?"Falha ao carregar recurso: "+resource:(event.message||"Erro JavaScript")+location)},true);' +
-    'window.addEventListener("unhandledrejection",event=>{const reason=event.reason;send("error",reason&&(reason.stack||reason.message)||reason||"Promise rejeitada")});' +
-    'const originalError=console.error.bind(console);console.error=(...args)=>{send("error",args.map(value=>typeof value==="string"?value:(()=>{try{return JSON.stringify(value)}catch{return String(value)}})()).join(" "));originalError(...args)};' +
-    'window.addEventListener("load",()=>send("ready","Prévia carregada"));})();</script>';
+    'const send=(type,data={})=>{try{parent.postMessage({__roboeducWorkspacePreview:true,type,...data},"*")}catch{}};' +
+    'const counters={pointerdown:0,pointermove:0,pointerup:0,pointercancel:0,lostpointercapture:0,touchstart:0,touchmove:0,touchend:0,error:0};' +
+    'const started=performance.now();let lastReport=0;' +
+    'const snapshot=()=>({counters:{...counters},viewport:{innerWidth,innerHeight,outerWidth,outerHeight,devicePixelRatio,visualViewport:visualViewport?{width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}:null},document:{visibilityState:document.visibilityState,hasFocus:document.hasFocus(),readyState:document.readyState,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight},screen:{width:screen.width,height:screen.height,orientation:screen.orientation?.type||"unknown"},canvas:[...document.querySelectorAll("canvas")].slice(0,8).map(c=>{const r=c.getBoundingClientRect();return{width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height,rect:{x:r.x,y:r.y}}}),frame:{isTop:window===window.top,origin:location.origin},uptimeMs:Math.round(performance.now()-started)});' +
+    'const report=()=>{const now=Date.now();if(now-lastReport<250)return;lastReport=now;send("telemetry",snapshot())};' +
+    'for(const name of Object.keys(counters)){const eventName=name;window.addEventListener(eventName,e=>{counters[eventName]++;if(eventName!=="pointermove"&&eventName!=="touchmove")send("input_event",{event:eventName,pointerId:e.pointerId??null,pointerType:e.pointerType??null,target:e.target?.id||e.target?.tagName||"unknown",isTrusted:e.isTrusted,buttons:e.buttons??null,activePointers:navigator.maxTouchPoints??0});report()},true)}' +
+    'window.addEventListener("resize",report,{passive:true});window.addEventListener("orientationchange",()=>setTimeout(report,100),{passive:true});document.addEventListener("visibilitychange",report);' +
+    'window.addEventListener("error",event=>{counters.error++;const target=event.target;const resource=target&&(target.src||target.href);const location=event.filename?" — "+event.filename+(event.lineno?":"+event.lineno)+(event.colno?":"+event.colno):"";send("error",{message:resource?"Falha ao carregar recurso: "+resource:(event.message||"Erro JavaScript")+location});report()},true);' +
+    'window.addEventListener("unhandledrejection",event=>{counters.error++;const reason=event.reason;send("error",{message:reason&&(reason.stack||reason.message)||reason||"Promise rejeitada"});report()});' +
+    'const originalError=console.error.bind(console);console.error=(...args)=>{counters.error++;send("error",{message:args.map(value=>typeof value==="string"?value:(()=>{try{return JSON.stringify(value)}catch{return String(value)}})()).join(" ")});originalError(...args);report()};' +
+    'const start=()=>{send("ready",{message:"Prévia carregada"});report();setInterval(report,1500)};if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();})();</script>';
 }
 /** Builds an isolated preview document and resolves virtual ES module imports. */
 export function buildWorkspacePreview(html: string, files: WorkspacePreviewFile[]): string {
