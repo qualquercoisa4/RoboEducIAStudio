@@ -20,7 +20,7 @@ type WorkspaceFileEvent =
   | { type: "file_complete"; path: string; contentLength: number };
 type WorkspaceApplyEvent = { type: "apply"; summary: string; operations: WorkspaceOperation[]; fileLengths: Record<string, number> };
 type WorkspaceAgentSession = { environmentId: string; interactionId: string };
-type StreamEvent = ProgressEvent | TokenEvent | ErrorEvent | WorkspacePlanEvent | WorkspaceFileEvent | WorkspaceApplyEvent | { type: "agent_session"; environmentId: string; interactionId: string } | { type: "done" } | { type: "reset" };
+type StreamEvent = ProgressEvent | TokenEvent | ErrorEvent | WorkspacePlanEvent | WorkspaceFileEvent | WorkspaceApplyEvent | { type: "agent_session"; environmentId: string; interactionId: string } | { type: "agent_progress"; index: number; stepType: string; label: string; state: "running" | "completed" } | { type: "agent_usage"; totalTokens: number; inputTokens: number; outputTokens: number; thoughtTokens: number } | { type: "done" } | { type: "reset" };
 
 const MODEL = process.env.CLOUDFLARE_MODEL?.trim() || "@cf/qwen/qwen3-30b-a3b-fp8";
 const MAX_MESSAGES = 14;
@@ -960,6 +960,8 @@ async function executeAntigravityWorkspaceEdit(args: {
   let streamCompleted = false;
   const executionEvidence: string[] = [];
   let streamedModelText = "";
+  let progressIndex = 0;
+  let latestUsage: { total_tokens?: number; total_input_tokens?: number; total_output_tokens?: number; total_thought_tokens?: number } = {};
   const stepLabels: Record<string, string> = {
     thought: "Analisando a solicitação e o projeto",
     model_output: "Preparando a próxima ação",
@@ -990,6 +992,7 @@ async function executeAntigravityWorkspaceEdit(args: {
         : null;
       if (value?.id) interactionId = value.id;
       const statusValue = typeof value?.status === "string" ? value.status : "";
+      if (value?.usage) { latestUsage = value.usage; send({ type: "agent_usage", totalTokens: latestUsage.total_tokens || 0, inputTokens: latestUsage.total_input_tokens || 0, outputTokens: latestUsage.total_output_tokens || 0, thoughtTokens: latestUsage.total_thought_tokens || 0 }); }
       if (statusValue) {
         const detail = statusValue === "in_progress"
           ? "Agente ativo. Preparando ferramentas e trabalhando no projeto."
@@ -1003,6 +1006,9 @@ async function executeAntigravityWorkspaceEdit(args: {
       const type = typeof step?.type === "string" ? step.type : "tool_call";
       const name = typeof step?.name === "string" ? " (" + step.name + ")" : "";
       executionEvidence.push("INÍCIO: " + type + name);
+      const stepIndex = typeof event.index === "number" ? event.index : progressIndex++;
+      const label = (stepLabels[type] || "Executando etapa: " + type.replace(/[_-]+/g, " ")) + name;
+      send({ type: "agent_progress", index: stepIndex, stepType: type, label, state: "running" });
       const detail = (stepLabels[type] || "Executando etapa: " + type.replace(/[_-]+/g, " ")) + name + ".";
       if (detail !== lastProgressKey) { lastProgressKey = detail; status("agent-step", detail); }
       return;
@@ -1032,6 +1038,9 @@ async function executeAntigravityWorkspaceEdit(args: {
     if (eventType === "step.stop") {
       const step = event.step && typeof event.step === "object" ? event.step as { type?: unknown } : null;
       executionEvidence.push("FIM DA ETAPA: " + (typeof step?.type === "string" ? step.type : "etapa"));
+      const stoppedIndex = typeof event.index === "number" ? event.index : Math.max(0, progressIndex - 1);
+      send({ type: "agent_progress", index: stoppedIndex, stepType: typeof step?.type === "string" ? step.type : "step", label: stepLabels[typeof step?.type === "string" ? step.type : ""] || "Etapa concluída", state: "completed" });
+      if (event.usage && typeof event.usage === "object") { latestUsage = event.usage as typeof latestUsage; send({ type: "agent_usage", totalTokens: latestUsage.total_tokens || 0, inputTokens: latestUsage.total_input_tokens || 0, outputTokens: latestUsage.total_output_tokens || 0, thoughtTokens: latestUsage.total_thought_tokens || 0 }); }
       status("agent-step-complete", "Etapa concluída. O agente está avançando para a próxima.");
       return;
     }
@@ -1040,6 +1049,7 @@ async function executeAntigravityWorkspaceEdit(args: {
         ? event.interaction as AgentInteraction
         : null;
       if (value) {
+        if (value.usage) { latestUsage = value.usage; send({ type: "agent_usage", totalTokens: latestUsage.total_tokens || 0, inputTokens: latestUsage.total_input_tokens || 0, outputTokens: latestUsage.total_output_tokens || 0, thoughtTokens: latestUsage.total_thought_tokens || 0 }); }
         finalInteraction = value;
         if (value.id) interactionId = value.id;
         if (value.environment_id) environmentId = value.environment_id;
@@ -1090,6 +1100,7 @@ async function executeAntigravityWorkspaceEdit(args: {
   if (detailResponse.ok) {
     const detail = await detailResponse.json() as AgentInteraction;
     interaction = { ...completedInteraction, ...detail };
+    if (detail.usage) { latestUsage = detail.usage; send({ type: "agent_usage", totalTokens: latestUsage.total_tokens || 0, inputTokens: latestUsage.total_input_tokens || 0, outputTokens: latestUsage.total_output_tokens || 0, thoughtTokens: latestUsage.total_thought_tokens || 0 }); }
   } else {
     const detail = await detailResponse.text().catch(() => "");
     executionEvidence.push("AVISO: não foi possível recuperar o objeto completo da interação (HTTP " + detailResponse.status + "). " + detail.slice(0, 300));
