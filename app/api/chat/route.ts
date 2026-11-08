@@ -880,6 +880,7 @@ async function executeAntigravityWorkspaceEdit(args: {
     environment_id?: string;
     status?: string;
     output_text?: string;
+    usage?: { total_tokens?: number; total_input_tokens?: number; total_output_tokens?: number; total_thought_tokens?: number };
     error?: { message?: string };
     steps?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
   };
