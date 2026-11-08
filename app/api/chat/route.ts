@@ -727,6 +727,12 @@ async function executeAntigravityWorkspaceEdit(args: {
     "- When network access or source verification is unavailable, say so and implement a smaller verified alternative instead of pretending research succeeded.",
     "- The workspace preview embeds local CSS/classic scripts and supports browser ES modules, local relative module imports, and the Three.js 0.160 import map. For other bare npm package imports, provide a browser CDN/import-map mapping. Verify exact CDN URLs and versions. The preview still does not run npm scripts or Vite dev servers.",
     "",
+    "## Large-task execution and resumability",
+    "- For broad requests such as recreating a large commercial game, do not attempt an exhaustive clone in one interaction. Define a compact, playable vertical slice, implement that slice completely, save all source files, run focused checks, and report the next milestones.",
+    "- For a Minecraft-like request, the first milestone is a playable voxel sandbox with chunked terrain, first-person movement, block targeting, breaking/placing, a hotbar, and basic mobile controls. Defer crafting, mobs, survival progression, multiplayer, and large biomes to later milestones unless already present.",
+    "- Avoid long research loops and oversized asset generation. Set a concrete implementation scope before coding and begin implementation promptly.",
+    "- The agent runs in background mode. If a request is interrupted by the platform time limit, preserve environment and interaction IDs as soon as the provider emits them so the user can resume.",
+    "",
     "## Prototype delivery standard",
     "- A prototype must launch and be interactable, not merely contain plausible source code. Include every required file, dependency, asset reference, and startup entry point.",
     "- The current live preview is a virtual HTML/CSS/JavaScript runtime: it embeds local CSS and classic scripts, resolves local relative ES-module imports, and maps Three.js 0.160 plus its addons. Other bare npm package imports need an explicit browser CDN/import-map mapping. It does not run npm scripts or Vite dev servers. Do not claim Vite/npm dev-server projects are previewed until a real project runtime is available.",
@@ -992,6 +998,9 @@ async function executeAntigravityWorkspaceEdit(args: {
         ? event.interaction as AgentInteraction
         : null;
       if (value?.id) interactionId = value.id;
+      if (value?.environment_id) environmentId = value.environment_id;
+      // Persist session identifiers as soon as the provider creates the interaction.
+      if (interactionId && environmentId) send({ type: "agent_session", environmentId, interactionId });
       const statusValue = typeof value?.status === "string" ? value.status : "";
       if (value?.usage) { latestUsage = value.usage; send({ type: "agent_usage", totalTokens: latestUsage.total_tokens || 0, inputTokens: latestUsage.total_input_tokens || 0, outputTokens: latestUsage.total_output_tokens || 0, thoughtTokens: latestUsage.total_thought_tokens || 0 }); }
       if (statusValue) {
@@ -1068,7 +1077,15 @@ async function executeAntigravityWorkspaceEdit(args: {
 
   try {
     while (true) {
-      if (signal.aborted) throw new Error("A solicitação foi cancelada. O agente pode continuar em segundo plano.");
+      if (signal.aborted) {
+        if (interactionId && environmentId) {
+          send({ type: "agent_session", environmentId, interactionId });
+          status("agent-resumable", "O limite de tempo desta requisição foi atingido. A sessão remota foi preservada; envie “continue” para retomar.");
+        }
+        throw new Error(interactionId && environmentId
+          ? "A requisição atingiu o limite de tempo da plataforma. A sessão do Antigravity foi preservada; envie “continue” para retomar."
+          : "A solicitação foi cancelada antes de a sessão remota ser identificada.");
+      }
       const part = await streamReader.read();
       if (part.done) break;
       streamBuffer += streamDecoder.decode(part.value, { stream: true });
@@ -1078,6 +1095,14 @@ async function executeAntigravityWorkspaceEdit(args: {
     }
     streamBuffer += streamDecoder.decode();
     if (streamBuffer.trim()) handleAgentEvent(streamBuffer);
+  } catch (error) {
+    if (interactionId && environmentId) {
+      send({ type: "agent_session", environmentId, interactionId });
+      if (signal.aborted || (error instanceof Error && /timeout|timed out|aborted/i.test(error.message))) {
+        status("agent-resumable", "A execução excedeu o tempo desta requisição. A sessão remota foi preservada para continuação.");
+      }
+    }
+    throw error;
   } finally {
     try { streamReader.releaseLock(); } catch {}
   }
