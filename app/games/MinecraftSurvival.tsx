@@ -586,6 +586,13 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     let hungerTimer = 0;
     let hungerDamageTimer = 0;
     let regenerationTimer = 0;
+    let hudTimer = 0;
+    let lastTime = performance.now();
+    let animationFrame = 0;
+    let destroyed = false;
+    let touchPointer: number | null = null;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
     const collidesAt = (x: number, y: number, z: number) => {
       const minX = Math.floor(x - 0.29), maxX = Math.floor(x + 0.29);
       const minZ = Math.floor(z - 0.29), maxZ = Math.floor(z + 0.29);
