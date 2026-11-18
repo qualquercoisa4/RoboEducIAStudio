@@ -113,7 +113,7 @@ const RECIPES: Recipe[] = [
     icon: "🧰", costs: { oak_planks: 4 }, output: "crafting_table", amount: 1,
   },
   {
-    id: "torch", title: "Tochas", description: "Ilumine seu abrigo e dificulte a aproximação de monstros.",
+    id: "torch", title: "Tochas", description: "Ilumine sua oficina e explore o mundo com segurança.",
     icon: "🕯️", costs: { coal: 1, stick: 1 }, output: "torch", amount: 4, needsTable: true,
   },
   {
@@ -213,7 +213,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
   const [craftOpen, setCraftOpen] = useState(false);
   const [furnaceOpen, setFurnaceOpen] = useState(false);
   const [locked, setLocked] = useState(false);
-  const [notice, setNotice] = useState("Colete madeira, minério e sobreviva à noite.");
+  const [notice, setNotice] = useState("Colete materiais e construa sua tecnologia RoboEduc.");
   const [gameOver, setGameOver] = useState(false);
   const [restart, setRestart] = useState(0);
   const [worldReady, setWorldReady] = useState(false);
@@ -586,44 +586,6 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     let hungerTimer = 0;
     let hungerDamageTimer = 0;
     let regenerationTimer = 0;
-    let spawnTimer = 0;
-    let mobDamageCooldown = 0;
-    let hudTimer = 0;
-    let lastTime = performance.now();
-    let animationFrame = 0;
-    let destroyed = false;
-    let touchPointer: number | null = null;
-    let lastTouchX = 0;
-    let lastTouchY = 0;
-
-    type Mob = { group: THREE.Group; attack: number; health: number };
-    const mobs: Mob[] = [];
-    const mobGeometry = new THREE.BoxGeometry(0.62, 0.72, 0.42);
-    const mobHeadGeometry = new THREE.BoxGeometry(0.58, 0.58, 0.58);
-    const mobBodyMaterial = new THREE.MeshLambertMaterial({ color: 0x4d9862 });
-    const mobHeadMaterial = new THREE.MeshLambertMaterial({ color: 0x70a46b });
-    const mobEyeMaterial = new THREE.MeshBasicMaterial({ color: 0xf5e7d0 });
-    const spawnMob = () => {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 12 + Math.random() * 5;
-      const x = Math.max(-20, Math.min(20, Math.round(player.x + Math.cos(angle) * distance)));
-      const z = Math.max(-20, Math.min(20, Math.round(player.z + Math.sin(angle) * distance)));
-      const y = terrainHeight(x, z) + 1;
-      const group = new THREE.Group();
-      const body = new THREE.Mesh(mobGeometry, mobBodyMaterial);
-      body.position.y = 0.68;
-      const head = new THREE.Mesh(mobHeadGeometry, mobHeadMaterial);
-      head.position.y = 1.32;
-      const eyeA = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.04), mobEyeMaterial);
-      eyeA.position.set(-0.14, 1.36, -0.3);
-      const eyeB = eyeA.clone();
-      eyeB.position.x = 0.14;
-      group.add(body, head, eyeA, eyeB);
-      group.position.set(x + 0.5, y, z + 0.5);
-      scene.add(group);
-      mobs.push({ group, attack: 0, health: 3 });
-    };
-
     const collidesAt = (x: number, y: number, z: number) => {
       const minX = Math.floor(x - 0.29), maxX = Math.floor(x + 0.29);
       const minZ = Math.floor(z - 0.29), maxZ = Math.floor(z + 0.29);
@@ -658,21 +620,6 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
     const mineBlock = () => {
       if (!startedRef.current || gameOverRef.current || inventoryOpenRef.current || craftOpenRef.current || furnaceOpenRef.current) return;
       raycaster.setFromCamera(center, camera);
-      const mobHits = raycaster.intersectObjects(mobs.map((mob) => mob.group), true);
-      if (mobHits.length) {
-        const hitMob = mobs.find((mob) => mob.group === mobHits[0].object || mob.group.children.includes(mobHits[0].object));
-        if (hitMob && mobHits[0].distance < 5.5) {
-          hitMob.health -= 1;
-          if (hitMob.health <= 0) {
-            scene.remove(hitMob.group);
-            hitMob.group.clear();
-            setNotice("Zumbi derrotado.");
-          } else {
-            setNotice("Você acertou o zumbi. Continue atacando.");
-          }
-          return;
-        }
-      }
       const target = currentTarget();
       if (!target || target.type === "bedrock") return;
       const position = target.position;
@@ -920,39 +867,6 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
           changeVitals(1, 0);
         }
 
-        spawnTimer += dt;
-        if (night && spawnTimer > 13 && mobs.length < 5) {
-          spawnTimer = 0;
-          spawnMob();
-        }
-        mobDamageCooldown = Math.max(0, mobDamageCooldown - dt);
-        mobs.forEach((mob) => {
-          const dx = player.x - mob.group.position.x;
-          const dz = player.z - mob.group.position.z;
-          const distance = Math.hypot(dx, dz);
-          if (distance < 17 && distance > 1.05) {
-            mob.group.position.x += (dx / distance) * 1.05 * dt;
-            mob.group.position.z += (dz / distance) * 1.05 * dt;
-            mob.group.rotation.y = Math.atan2(dx, dz);
-          } else if (distance <= 1.05 && mobDamageCooldown <= 0) {
-            mobDamageCooldown = 1.25;
-            changeVitals(-2, 0);
-            player.x -= (dx / Math.max(0.1, distance)) * 0.45;
-            player.z -= (dz / Math.max(0.1, distance)) * 0.45;
-            setNotice("Um zumbi acertou você. Afaste-se ou construa abrigo.");
-          }
-          mob.group.position.y = terrainHeight(Math.round(mob.group.position.x), Math.round(mob.group.position.z)) + 1;
-        });
-        mobs.forEach((mob) => {
-          if (mob.health <= 0 || Math.hypot(mob.group.position.x - player.x, mob.group.position.z - player.z) > 35) {
-            scene.remove(mob.group);
-            mob.group.clear();
-          }
-        });
-        for (let i = mobs.length - 1; i >= 0; i--) {
-          if (mobs[i].group.children.length === 0) mobs.splice(i, 1);
-        }
-
         updateCamera();
         updateHighlight();
         hudTimer += dt;
@@ -994,11 +908,6 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
         else material.dispose();
       });
       blockTextures.forEach((texture) => texture.dispose());
-      mobGeometry.dispose();
-      mobHeadGeometry.dispose();
-      mobBodyMaterial.dispose();
-      mobHeadMaterial.dispose();
-      mobEyeMaterial.dispose();
       keys.forward = keys.backward = keys.left = keys.right = keys.jump = false;
     };
   }, [restart]);
@@ -1025,7 +934,7 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       <header className="mc-topbar">
         <div className="mc-title">
           <strong>{gameName}</strong>
-          <small>MUNDO DE SOBREVIVÊNCIA</small>
+          <small>MUNDO DE CONSTRUÇÃO ROBÓTICA</small>
         </div>
         <div className="mc-vitals">
           <div className="mc-vital">
@@ -1047,8 +956,8 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       </header>
 
       <div className="mc-left-tip">
-        <b>{hud.night ? "A noite chegou" : "Sobreviva e construa"}</b>
-        <span>{hud.night ? "Zumbis aparecem no escuro." : "Colete madeira e prepare seu abrigo."}</span>
+        <b>{hud.night ? "Ciclo noturno" : "Explore e construa"}</b>
+        <span>{hud.night ? "A iluminação diminui. Use tochas para enxergar." : "Colete materiais e monte sua oficina."}</span>
       </div>
 
       {notice && <div className="mc-notice">{notice}</div>}
@@ -1176,9 +1085,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       {!started && (
         <div className="mc-start-screen">
           <div className="mc-start-card">
-            <span className="mc-start-kicker">ROBOEDUC · MODO SOBREVIVÊNCIA</span>
-            <h1>Um mundo em blocos.<br />Uma aventura sua.</h1>
-            <p>Explore, minere, construa seu abrigo e sobreviva ao ciclo de dia e noite. Crie também sua Bancada RoboEduc e desenvolva um núcleo robótico.</p>
+            <span className="mc-start-kicker">ROBOEDUC · MUNDO DE CONSTRUÇÃO</span>
+            <h1>Um mundo em blocos.<br />Sua oficina robótica.</h1>
+            <p>Explore, minere e construa livremente. Reúna cobre, ferro e redstone para montar sua Bancada RoboEduc e desenvolver componentes tecnológicos.</p>
             <div className="mc-start-controls">
               <span><b>W A S D</b> mover</span>
               <span><b>Mouse</b> olhar</span>
@@ -1194,9 +1103,9 @@ export default function MinecraftSurvival({ gameName, onExit }: { gameName: stri
       {gameOver && (
         <div className="mc-start-screen mc-game-over">
           <div className="mc-start-card">
-            <span className="mc-start-kicker">FIM DE JOGO</span>
-            <h1>Sua aventura terminou.</h1>
-            <p>Você não conseguiu sobreviver. Recomece para tentar construir um abrigo melhor antes da noite.</p>
+            <span className="mc-start-kicker">PROTÓTIPO INTERROMPIDO</span>
+            <h1>Vamos tentar novamente?</h1>
+            <p>Seu explorador ficou sem energia após quedas. Gere um novo mundo e continue construindo seu projeto.</p>
             <button onClick={restartGame}>GERAR NOVO MUNDO</button>
             <button className="mc-secondary" onClick={onExit}>VOLTAR AO ESTÚDIO</button>
           </div>
