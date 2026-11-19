@@ -26,19 +26,19 @@ const questions = [
 
 function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { gameName:string; styleId:string; objectiveId:string; typeId:string; onExit:()=>void }) {
  const canvasRef=useRef<HTMLCanvasElement|null>(null);
- const [score,setScore]=useState(0),[lives,setLives]=useState(3);
+ const [score,setScore]=useState(0),[lives,setLives]=useState(typeId==="lab"?4:typeId==="sandbox"?5:3);
  const [won,setWon]=useState(false),[lost,setLost]=useState(false),[progress,setProgress]=useState(0);
  const keys=useRef({left:false,right:false,jump:false});
  const [restart,setRestart]=useState(0);
  const isSonic=styleId==="sonic",isMinecraft=styleId==="minecraft",isArduino=styleId==="arduino";
  const isBuild=objectiveId==="build",isExplore=objectiveId==="explore",isProgram=objectiveId==="program",isCircuit=objectiveId==="circuit";
- const isAdventure=typeId==="adventure";
+ const isAdventure=typeId==="adventure",isSandbox=typeId==="sandbox",isLab=typeId==="lab";
  useEffect(()=>{
   const canvas=canvasRef.current;if(!canvas)return;
   const ctx=canvas.getContext("2d");if(!ctx)return;
   const W=960,H=540,worldW=3000;
   let player={x:70,y:365,vx:0,vy:0,w:34,h:48,onGround:false,invuln:0,jumps:0};
-  let camera=0,localScore=0,localLives=3,done=false,frame=0,lastTime=0,elapsed=0,collectedCount=0,jumpWasDown=false;
+  let camera=0,localScore=0,localLives=isLab?4:isSandbox?5:3,done=false,frame=0,lastTime=0,elapsed=0,collectedCount=0,jumpWasDown=false;
   const colors=isMinecraft?{sky:"#79bde9",far:"#5e9d74",top:"#78b84c",side:"#8c633f",accent:"#f0c94c",player:"#42a447"}:
    isArduino?{sky:"#d7e8f1",far:"#668f9d",top:"#4aa6a0",side:"#536d79",accent:"#f0c94c",player:"#278da0"}:
    styleId==="roblox"?{sky:"#71d5f4",far:"#72c6a0",top:"#62c85b",side:"#278e62",accent:"#ffdc43",player:"#e8b13f"}:
@@ -62,23 +62,23 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
    const sx=canvas.width/W,sy=canvas.height/H;ctx.setTransform(sx,0,0,sy,0,0);ctx.clearRect(0,0,W,H);
    if(!done){
     elapsed+=dt/60;
-    const speed=isSonic?6.4:4.3;
+    const speed=(isSonic?6.4:4.3)*(isSandbox?0.88:isLab?1.08:1);
     player.vx=((keys.current.right?1:0)-(keys.current.left?1:0))*speed;
     const oldY=player.y;player.x=Math.max(0,Math.min(worldW-player.w,player.x+player.vx*dt));
-    if(keys.current.jump&&!jumpWasDown&&(player.onGround||(isAdventure&&player.jumps<2))){player.vy=isSonic?-13.5:-12.4;player.onGround=false;player.jumps++;}jumpWasDown=keys.current.jump;
-    player.vy=Math.min(14,player.vy+0.58*dt);player.y+=player.vy*dt;player.onGround=false;
+    if(keys.current.jump&&!jumpWasDown&&(player.onGround||(isAdventure&&player.jumps<2)||(isSandbox&&player.jumps<3))){player.vy=isSonic?-13.5:isSandbox?-10.8:-12.4;player.onGround=false;player.jumps++;}jumpWasDown=keys.current.jump;
+    player.vy=Math.min(14,player.vy+(isSandbox?0.38:isLab?0.68:0.58)*dt);player.y+=player.vy*dt;player.onGround=false;
     platforms.forEach(p=>{if(player.x+player.w>p.x&&player.x<p.x+p.w&&oldY+player.h<=p.y+10&&player.y+player.h>=p.y&&player.vy>=0){player.y=p.y-player.h;player.vy=0;player.onGround=true;player.jumps=0;}});
     if(player.invuln>0)player.invuln-=dt;
     collectibles.forEach(item=>{if(!item.taken&&Math.abs(player.x+player.w/2-item.x)<27&&Math.abs(player.y+player.h/2-item.y)<34){item.taken=true;collectedCount++;localScore+=isExplore?25:isBuild?15:10;setScore(localScore);setProgress(collectedCount);}});
 
-    if(player.y>H+70){damage();player.y=250;player.vy=0;}
-    checkpoints.forEach(cp=>{if(player.x>cp.x&&!cp.active){cp.active=true;localScore+=30;setScore(localScore);}});
+    if(player.y>H+70){if(isSandbox){player.y=220;player.x=Math.max(0,player.x-35);player.vy=0;}else{damage();player.y=250;player.vy=0;}}
+    checkpoints.forEach(cp=>{if(player.x+player.w/2>cp.x&&!cp.active){cp.active=true;localScore+=isCircuit?60:isLab?45:30;setScore(localScore);}});
     
     if(isBuild&&collectedCount>=5&&player.x>2650)setResult(true);
     else if(isExplore&&collectedCount>=6&&player.x>2650)setResult(true);
     else if(isProgram&&collectedCount>=8&&player.x>2650)setResult(true);
     else if(isCircuit&&checkpoints.every(cp=>cp.active)&&player.x>2650)setResult(true);
-    else if(!isBuild&&!isExplore&&!isProgram&&!isCircuit&&player.x>2850)setResult(true);
+    else if(isLab&&player.x>2650&&checkpoints.every(cp=>cp.active)&&(!isBuild&&!isExplore&&!isProgram&&!isCircuit||collectedCount>=(isBuild?5:isExplore?6:isProgram?8:0)))setResult(true);\n    else if(!isBuild&&!isExplore&&!isProgram&&!isCircuit&&!isLab&&player.x>2850)setResult(true);
     camera=Math.max(0,Math.min(worldW-W,player.x-W*.38));
    }
    // Background and parallax
@@ -88,7 +88,7 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
    for(let i=0;i<12;i++){ctx.fillStyle=colors.far;ctx.globalAlpha=.75;ctx.beginPath();ctx.moveTo(i*300-40,480);ctx.quadraticCurveTo(i*300+100,260,i*300+260,480);ctx.fill();}ctx.globalAlpha=1;ctx.restore();
    ctx.save();ctx.translate(-camera,0);
    platforms.forEach((p,i)=>{ctx.fillStyle=colors.top;ctx.fillRect(p.x,p.y,p.w,12);ctx.fillStyle=colors.side;ctx.fillRect(p.x,p.y+12,p.w,p.h-12);if(isMinecraft){for(let x=p.x+8;x<p.x+p.w-8;x+=28){ctx.fillStyle="#ffffff18";ctx.fillRect(x,p.y+18,13,13);}}else if(styleId==="roblox"){ctx.fillStyle="#ffffff22";ctx.fillRect(p.x,p.y+12,p.w,5);}});
-   collectibles.forEach(item=>{if(item.taken)return;ctx.fillStyle=colors.accent;ctx.beginPath();if(isMinecraft||isBuild)ctx.fillRect(item.x-10,item.y-10,20,20);else ctx.ellipse(item.x,item.y,11,15,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#fff8c7";ctx.lineWidth=3;ctx.stroke();});
+   collectibles.forEach(item=>{if(item.taken)return;ctx.fillStyle=isProgram?"#8b75ed":isCircuit?"#31c6b0":isExplore?"#62c9f0":colors.accent;ctx.beginPath();if(isProgram){ctx.roundRect(item.x-12,item.y-9,24,18,4);ctx.fillStyle="#fff";ctx.fillRect(item.x-6,item.y-3,12,2);ctx.fillRect(item.x-6,item.y+2,8,2);}else if(isCircuit){ctx.arc(item.x,item.y,12,0,Math.PI*2);ctx.fillStyle="#eafff9";ctx.fillRect(item.x-2,item.y-7,4,14);ctx.fillRect(item.x-7,item.y-2,14,4);}else if(isMinecraft||isBuild)ctx.fillRect(item.x-10,item.y-10,20,20);else ctx.ellipse(item.x,item.y,11,15,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#fff8c7";ctx.lineWidth=3;ctx.stroke();});
 
    checkpoints.forEach(cp=>{ctx.fillStyle=cp.active?"#a8ec4d":"#ffffff";ctx.fillRect(cp.x,300,5,165);ctx.fillStyle=cp.active?"#a8ec4d":"#ffb84d";ctx.beginPath();ctx.moveTo(cp.x+5,302);ctx.lineTo(cp.x+55,320);ctx.lineTo(cp.x+5,340);ctx.fill();});
    // Goal gate
@@ -97,7 +97,7 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
    if(!(player.invuln>0&&Math.floor(frame/5)%2===0)){
     if(isSonic){ctx.fillStyle="#0876d5";ctx.beginPath();ctx.arc(player.x+17,player.y+24,21,0,Math.PI*2);ctx.fill();ctx.fillStyle="#f5d2a2";ctx.beginPath();ctx.ellipse(player.x+21,player.y+27,10,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.fillRect(player.x+20,player.y+12,8,10);}
     else if(isMinecraft){ctx.fillStyle=colors.player;ctx.fillRect(player.x+4,player.y+16,27,28);ctx.fillStyle="#e9b88e";ctx.fillRect(player.x+5,player.y,25,20);ctx.fillStyle="#4b3026";ctx.fillRect(player.x+5,player.y,25,6);}
-    else if(styleId==="roblox"){ctx.fillStyle=colors.player;ctx.fillRect(player.x+4,player.y+17,27,27);ctx.fillStyle="#f4c58d";ctx.fillRect(player.x+6,player.y,23,20);ctx.fillStyle="#333";ctx.fillRect(player.x+21,player.y+7,3,3);}
+    else if(styleId==="roblox"){ctx.fillStyle=colors.player;ctx.fillRect(player.x+4,player.y+17,27,27);ctx.fillStyle="#f4c58d";ctx.fillRect(player.x+6,player.y,23,20);ctx.fillStyle="#333";ctx.fillRect(player.x+21,player.y+7,3,3);}\n    else if(isArduino){ctx.fillStyle="#168d91";ctx.fillRect(player.x+2,player.y+13,30,31);ctx.fillStyle="#f1c64c";ctx.fillRect(player.x+8,player.y+2,18,14);ctx.fillStyle="#253b4a";ctx.fillRect(player.x+12,player.y+7,3,3);ctx.fillRect(player.x+20,player.y+7,3,3);ctx.fillStyle="#f1c64c";ctx.fillRect(player.x,player.y+20,4,7);ctx.fillRect(player.x+30,player.y+20,4,7);}
     else {ctx.fillStyle=colors.player;ctx.fillRect(player.x+4,player.y+16,27,28);ctx.fillStyle="#f0c49b";ctx.beginPath();ctx.arc(player.x+17,player.y+10,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#243a5a";ctx.fillRect(player.x+22,player.y+7,4,4);}
     ctx.fillStyle="#293a69";ctx.fillRect(player.x+2,player.y+43,13,6);ctx.fillRect(player.x+20,player.y+43,13,6);
    }
@@ -107,15 +107,15 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
   };
   raf=requestAnimationFrame(draw);
   return()=>{cancelAnimationFrame(raf);observer.disconnect();window.removeEventListener("keydown",keyDown);window.removeEventListener("keyup",keyUp);keys.current={left:false,right:false,jump:false};};
- },[restart,styleId,objectiveId,typeId,isBuild,isExplore,isProgram,isCircuit,isSonic,isMinecraft,isArduino,isAdventure]);
+ },[restart,styleId,objectiveId,typeId,isBuild,isExplore,isProgram,isCircuit,isSonic,isMinecraft,isArduino,isAdventure,isSandbox,isLab]);
  const hold=(key:"left"|"right"|"jump",value:boolean)=>{keys.current[key]=value;};
- const restartGame=()=>{setScore(0);setLives(3);setProgress(0);setWon(false);setLost(false);setRestart(v=>v+1);};
- const goalText=isBuild?"Colete 5 peças e alcance a estação":isExplore?"Encontre 6 componentes e alcance a estação":isProgram?"Colete 8 chips de código e alcance a estação":isCircuit?"Ative os 3 pontos de teste e alcance a estação":"Chegue à estação final";
+ const restartGame=()=>{setScore(0);setLives(isLab?4:isSandbox?5:3);setProgress(0);setWon(false);setLost(false);setRestart(v=>v+1);};
+ const goalText=isBuild?"Colete 5 peças e alcance a estação":isExplore?"Encontre 6 componentes e alcance a estação":isProgram?"Colete 8 chips de código e alcance a estação":isCircuit?"Ative os 3 pontos de teste e alcance a estação":isLab?"Ative os terminais e conclua a missão":"Chegue à estação final";
  return <div className="play-screen">
   <canvas ref={canvasRef} width={960} height={540} className="platform-canvas"/>
-  <div className="game-hud"><div className="hud-brand"><span className="hud-dot"/> {gameName}</div><div className="hud-stats"><span>★ {score}</span><span>♥ {lives}</span><span className="hud-level">{goalText} · {progress}/{isBuild?5:isExplore?6:isProgram?8:3}</span></div><button className="hud-menu" onClick={onExit}>Ⅱ MENU</button></div>
+  <div className="game-hud"><div className="hud-brand"><span className="hud-dot"/> {gameName}</div><div className="hud-stats"><span>★ {score}</span><span>♥ {lives}</span><span className="hud-level">{goalText} · {progress}/{isBuild?5:isExplore?6:isProgram?8:isCircuit?3:isLab?3:0}</span></div><button className="hud-menu" onClick={onExit}>Ⅱ MENU</button></div>
   <div className="touch-controls"><div className="move-controls"><button aria-label="Mover para esquerda" onPointerDown={()=>hold("left",true)} onPointerUp={()=>hold("left",false)} onPointerCancel={()=>hold("left",false)} onPointerLeave={()=>hold("left",false)}>◀</button><button aria-label="Mover para direita" onPointerDown={()=>hold("right",true)} onPointerUp={()=>hold("right",false)} onPointerCancel={()=>hold("right",false)} onPointerLeave={()=>hold("right",false)}>▶</button></div><button className="jump-control" onPointerDown={()=>hold("jump",true)} onPointerUp={()=>hold("jump",false)} onPointerCancel={()=>hold("jump",false)} onPointerLeave={()=>hold("jump",false)}>PULAR</button></div>
-  {(won||lost)&&<div className="game-result"><div className="result-stars">{won?"★ ★ ★":"✦"}</div><h2>{won?"VOCÊ CONSEGUIU!":"FIM DE JOGO"}</h2><p>Pontuação: {score}</p><p>{won?"Objetivo concluído!":"Tente novamente para superar o desafio."}</p><button className="continue-button" onClick={restartGame}>JOGAR NOVAMENTE</button><button className="back-button" onClick={onExit}>VOLTAR AO MENU</button></div>}
+  {(won||lost)&&<div className="game-result"><div className="result-stars">{won?"★ ★ ★":"✦"}</div><h2>{won?"VOCÊ CONSEGUIU!":"FIM DE JOGO"}</h2><p>Pontuação: {score}</p><p>{won?(isLab?"Todos os terminais foram validados!":"Objetivo concluído!"):"Tente novamente para superar o desafio."}</p><button className="continue-button" onClick={restartGame}>JOGAR NOVAMENTE</button><button className="back-button" onClick={onExit}>VOLTAR AO MENU</button></div>}
  </div>;
 }
 export default function Home(){
