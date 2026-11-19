@@ -74,11 +74,9 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
     if(player.y>H+70){if(isSandbox){player.y=220;player.x=Math.max(0,player.x-35);player.vy=0;}else{damage();player.y=250;player.vy=0;}}
     checkpoints.forEach(cp=>{if(player.x+player.w/2>cp.x&&!cp.active){cp.active=true;localScore+=isCircuit?60:isLab?45:30;setScore(localScore);}});
     
-    if(isBuild&&collectedCount>=5&&player.x>2650)setResult(true);
-    else if(isExplore&&collectedCount>=6&&player.x>2650)setResult(true);
-    else if(isProgram&&collectedCount>=8&&player.x>2650)setResult(true);
-    else if(isCircuit&&checkpoints.every(cp=>cp.active)&&player.x>2650)setResult(true);
-    else if(isLab&&player.x>2650&&checkpoints.every(cp=>cp.active)&&(!isBuild&&!isExplore&&!isProgram&&!isCircuit||collectedCount>=(isBuild?5:isExplore?6:isProgram?8:0)))setResult(true);\n    else if(!isBuild&&!isExplore&&!isProgram&&!isCircuit&&!isLab&&player.x>2850)setResult(true);
+    const objectiveComplete=isBuild?collectedCount>=5:isExplore?collectedCount>=6:isProgram?collectedCount>=8:isCircuit?checkpoints.every(cp=>cp.active):true;
+    const labComplete=!isLab||checkpoints.every(cp=>cp.active);
+    if(player.x>(isLab?2650:2850)&&objectiveComplete&&labComplete)setResult(true);
     camera=Math.max(0,Math.min(worldW-W,player.x-W*.38));
    }
    // Background and parallax
@@ -97,7 +95,8 @@ function PlatformGame({ gameName, styleId, objectiveId, typeId, onExit }: { game
    if(!(player.invuln>0&&Math.floor(frame/5)%2===0)){
     if(isSonic){ctx.fillStyle="#0876d5";ctx.beginPath();ctx.arc(player.x+17,player.y+24,21,0,Math.PI*2);ctx.fill();ctx.fillStyle="#f5d2a2";ctx.beginPath();ctx.ellipse(player.x+21,player.y+27,10,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.fillRect(player.x+20,player.y+12,8,10);}
     else if(isMinecraft){ctx.fillStyle=colors.player;ctx.fillRect(player.x+4,player.y+16,27,28);ctx.fillStyle="#e9b88e";ctx.fillRect(player.x+5,player.y,25,20);ctx.fillStyle="#4b3026";ctx.fillRect(player.x+5,player.y,25,6);}
-    else if(styleId==="roblox"){ctx.fillStyle=colors.player;ctx.fillRect(player.x+4,player.y+17,27,27);ctx.fillStyle="#f4c58d";ctx.fillRect(player.x+6,player.y,23,20);ctx.fillStyle="#333";ctx.fillRect(player.x+21,player.y+7,3,3);}\n    else if(isArduino){ctx.fillStyle="#168d91";ctx.fillRect(player.x+2,player.y+13,30,31);ctx.fillStyle="#f1c64c";ctx.fillRect(player.x+8,player.y+2,18,14);ctx.fillStyle="#253b4a";ctx.fillRect(player.x+12,player.y+7,3,3);ctx.fillRect(player.x+20,player.y+7,3,3);ctx.fillStyle="#f1c64c";ctx.fillRect(player.x,player.y+20,4,7);ctx.fillRect(player.x+30,player.y+20,4,7);}
+    else if(styleId==="roblox"){ctx.fillStyle=colors.player;ctx.fillRect(player.x+4,player.y+17,27,27);ctx.fillStyle="#f4c58d";ctx.fillRect(player.x+6,player.y,23,20);ctx.fillStyle="#333";ctx.fillRect(player.x+21,player.y+7,3,3);}
+    else if(isArduino){ctx.fillStyle="#168d91";ctx.fillRect(player.x+2,player.y+13,30,31);ctx.fillStyle="#f1c64c";ctx.fillRect(player.x+8,player.y+2,18,14);ctx.fillStyle="#253b4a";ctx.fillRect(player.x+12,player.y+7,3,3);ctx.fillRect(player.x+20,player.y+7,3,3);ctx.fillStyle="#f1c64c";ctx.fillRect(player.x,player.y+20,4,7);ctx.fillRect(player.x+30,player.y+20,4,7);}
     else {ctx.fillStyle=colors.player;ctx.fillRect(player.x+4,player.y+16,27,28);ctx.fillStyle="#f0c49b";ctx.beginPath();ctx.arc(player.x+17,player.y+10,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#243a5a";ctx.fillRect(player.x+22,player.y+7,4,4);}
     ctx.fillStyle="#293a69";ctx.fillRect(player.x+2,player.y+43,13,6);ctx.fillRect(player.x+20,player.y+43,13,6);
    }
